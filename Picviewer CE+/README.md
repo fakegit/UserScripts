@@ -1,8 +1,8 @@
-# Popup/scale/rotate/batch save pictures and load pictures from next pages automatically. 
+# 🏞️ Picviewer CE+
 
-Press CTRL+g to enter gallery quickly. Hold CTRL to view larger picture when mouse over images or links.
+[![twitter](https://img.shields.io/twitter/follow/HoothinDev)](https://twitter.com/intent/follow?screen_name=HoothinDev) [![Discord](https://img.shields.io/badge/Discord-Join-blue.svg?logo=discord&style=social)](https://discord.com/invite/keqypXC6wD) [![reddit](https://img.shields.io/reddit/subreddit-subscribers/PicviewerCE)](https://www.reddit.com/r/PicviewerCE) [![stars](https://img.shields.io/github/stars/Hoothin/UserScripts)](https://github.com/hoothin/UserScripts#StarMe)
 
-More settings in "Picviewer CE+ config" to be customized, reviewing them is currently the best way to learn about what the script is capable of. try to seach more functions by yourself ! 
+### Zoom images across all your favorite websites. Pop up, scale, edit, rotate, batch save images, or automatically load pictures from subsequent pages. Simply hover your mouse over any image and click the icons on the float bar.
 
 + **Adjust:** Scale/rotate/batch save every picture
 
@@ -17,47 +17,278 @@ More settings in "Picviewer CE+ config" to be customized, reviewing them is curr
 
 + View long image by scroll
 
-+ Change webp to png
+Recommended similar plugins: [Imagus](https://chromewebstore.google.com/detail/imagus/immpkjjlgappgfkkfieppnmlhakdmaab) - [Hover-zoom+](https://chromewebstore.google.com/detail/hover-zoom+/pccckmaobkjjboncdfnnofkonhgpceea) - [Mouseover Popup Image Viewer](https://greasyfork.org/scripts/394820)
 
-+ And so on ...
+## Quick Start
 
-If you are glad to help me translate Picviewer CE+, [come here](https://github.com/hoothin/UserScripts/blob/master/Picviewer%20CE%2B/pvcep_lang.js#L1).
-It will help the people who speak the same language just like you. Thank you.
+Install from [Github📥](https://hoothin.github.io/UserScripts/Picviewer%20CE+/dist.user.js) or [Greasefork📥](https://greasyfork.org/scripts/24204-picviewer-ce).
 
-If you wish to add more rules for peculiar sites, come to [my Github](https://github.com/hoothin/UserScripts/blob/master/Picviewer%20CE%2B/pvcep_rules.js) and pull requests or open issues.
+Hover your mouse over any image and click the icons on the float bar.
 
-### Custom rules example for config:
+Press `CTRL + G` to quickly enter the gallery. Hold `CTRL` to view a larger picture when hovering over images or links.
 
-**1.**
-This can add click-to-open for existing asiansister rule. Place it into the '[]' of rule textarea.
-<pre>
+There are additional settings available in the "Picviewer CE+ config" for further customization. Currently, reviewing these settings is the best way to learn about the script's capabilities. Try exploring more functions on your own!
+
+## Contribution & Support
+
+If you are glad to assist with the translation, please ✍️[edit this file](https://github.com/hoothin/UserScripts/edit/master/Picviewer%20CE%2B/pvcep_lang.js#L1). It will be beneficial for individuals who speak the same language as you do. Thank you for your help.
+
++ English by [RX-3200](https://greasyfork.org/users/43-rx-3200).
+
++ Português by [AstroCoelestis](https://greasyfork.org/users/881248).
+
++ Русский by RX-3200 & vanja-san.
+
++ Turkish by [PUFF1N](https://github.com/PUFF1N-000).
+
++ Ukrainian by [MaSHiNiK](https://github.com/MaSHiNiK).
+
++ Arabic by [Prankster 199](https://github.com/vfggf95565).
+
+*Need more rules for peculiar sites? feel free to pull requests or open issues.*
+
+## PDF Addon
+Picviewer CE+ [PDF Addon](https://hoothin.github.io/UserScripts/Picviewer%20CE+/pvcep_pdf_addon.user.js). After installing this addon, when the `Compress to ZIP` feature is enabled, a PDF file will be generated instead of a ZIP file during the packaging process.
+
+<details>
+<summary>Make a PDF e-book with this addon</summary>
+<p dir="auto">For example, if there is a website with images from <code>xxx.com/1.jpg</code> to <code>xxx.com/99.jpg</code>, you can use this addon to generate a beautiful PDF e-book as follows:</p>
+<ol dir="auto">
+<li>Open the gallery by pressing Ctrl + g</li>
+<li>In the <code>Command</code> menu, find and click <code>Add image</code></li>
+<li>Input <code>xxx.com/[1-99].jpg</code></li>
+<li>Right-click in the thumbnail frame below to ignore any unwanted images</li>
+<li>Click <code>Download all shown</code> in the <code>Command</code> menu</li>
+</ol>
+<p dir="auto">This way, you'll get a beautifully created PDF e-book.</p>
+ </details>
+
+## Custom [Rules Example](pvcep_rules.js):
+**💝 Buy me a coffee with [Ko-fi](https://ko-fi.com/hoothin) or [愛發電](https://afdian.com/a/hoothin) to keep my scripts always up to date.**
+
+<a href="https://github.com/hoothin/UserScripts/raw/master/Picviewer%20CE%2B/customRule.png"><img src="customRule.png" height="100"></a>
+
++ Match image src(no matter which site) with /pics\\.dmm\\.co\\.jp/i and replace image url from "ps.jpg" to "pl.jpg"
+
+``` json
 {
-&nbsp;name: "asiansister",
-&nbsp;clickToOpen:{
-&nbsp;&nbsp;enabled:true,
-&nbsp;&nbsp;preventDefault:true,
-&nbsp;&nbsp;type:'actual'
-&nbsp;}
+    "name": "Dmm",
+    "src": "pics\\.dmm\\.co\\.jp",
+    "r": "ps.jpg",
+    "s": "pl.jpg"
 }
-</pre> 
-<br>
-<b>2.</b>
-This can add large-image rule for dmm to view high-definition original images or download them.
-<pre>
+```
++ Match site with /xxx\.com/ and replace image url from /us\\.xxx\\.com/\d+wm\//i to "previews.xxx.com/images/"
+
+``` json
 {
-&nbsp;name: "dmm",
-&nbsp;src: /pics\.dmm\.co\.jp/i,
-&nbsp;r: "ps.jpg",
-&nbsp;s: "pl.jpg"
+   "name": "Example",
+   "url": "^https://xxx\\.com/",
+   "r": "/us\\.xxx\\.com/\\d+wm//i",
+   "s": "previews.xxx.com/images/"
 }
-</pre>
+```
++ Add click-to-open for existing asiansister rule.
 
-*Buy me a coffee with [PayPal.Me](https://paypal.me/hoothin) or [BuyMeACoffee](https://buymeacoffee.com/hoothin) to keep my scripts always up to date.*
+``` json
+{
+    "name": "Asiansister",
+    "clickToOpen": {
+        "enabled": true,
+        "preventDefault": true,
+        "type": "actual",
+        "button": 0,
+        "alt": false,
+        "ctrl": false,
+        "shift": false,
+        "meta": false
+    }
+}
+```
+You have the option to use a standalone userscript, which allows you to manage all of your custom rules effectively.
 
-<img src='https://v2fy.com/asset/063_picviewer_ce/72723103-d911ce00-3bba-11ea-9541-0be746977dbc.gif' width=330><img src='https://v2fy.com/asset/063_picviewer_ce/72767872-7eb35480-3c30-11ea-814d-ce4678c81089.gif' width=330><img src='https://v2fy.com/asset/063_picviewer_ce/73130353-c4598e00-4031-11ea-810e-9498677a40d1.gif' width=330>
+Feel free to share your own custom rules on Greasy Fork!
 
-Thousands compatible sites for find larger or original images like
---
+``` js
+// ==UserScript==
+// @name         Picviewer CE+ custom rules
+// @namespace    hoothin
+// @version      0.1
+// @description  Picviewer CE+ custom rules
+// @author       You
+// @match        *://*/*
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    window.pvcepRules = (window.pvcepRules || []).concat([
+         //Delete these two example rules and add your own.
+         {
+             name: "rule1",
+             src: /pics\.dmm\.co\.jp/i,
+             r: "ps.jpg",
+             s: "pl.jpg"
+         },
+         {
+             name: "rule2",
+             url: /^https:\/\/xxx\.com\//,
+             r: /us\.xxx\.com\/\d+wm\//i,
+             s: "previews.xxx.com/images/"
+         }
+    ]);
+})();
+```
+
+
+<details>
+<summary>Advance rule wizard</summary>
+<p dir="auto">There are two types of rules available:</p>
+<ul dir="auto">
+<li>
+<p dir="auto">JSON (simple mode)</p>
+<p dir="auto">These rules are written in JSON format and can be imported online through <a href="https://github.com/hoothin/UserScripts/discussions">Discussions</a> or <a href="https://www.reddit.com/r/PicviewerCE" rel="nofollow">Reddit</a>.
+They won't limited by websites that have a strict Content Security Policy that disallows unsafe-eval.</p>
+<ul dir="auto">
+<li>JSON params
+<ul dir="auto">
+<li>
+<p dir="auto">name</p>
+<p dir="auto"><code>"name": "rule name"</code></p>
+<p dir="auto">Name of the rule</p>
+</li>
+<li>
+<p dir="auto">url</p>
+<p dir="auto"><code>"url": "^https://google\\.com"</code></p>
+<p dir="auto">Regular expression used to match the site URL.</p>
+</li>
+<li>
+<p dir="auto">src</p>
+<p dir="auto"><code>"src": "^https://image\\.xx\\.com"</code></p>
+<p dir="auto">Regular expression used to match the image src</p>
+</li>
+<li>
+<p dir="auto">r</p>
+<p dir="auto"><code>"r": "/(.*)\\d+/i"</code> or <code>"r": "thumb"</code></p>
+<p dir="auto">Simple string or regular expression used to replace the image src from</p>
+</li>
+<li>
+<p dir="auto">s</p>
+<p dir="auto"><code>"s": "$1"</code></p>
+<p dir="auto">Replace the image src to</p>
+</li>
+<li>
+<p dir="auto">ext</p>
+<p dir="auto"><code>"ext": "previous"</code></p>
+<p dir="auto">Capture nearby image element when the mouse hovers over a non-image element.</p>
+</li>
+<li>
+<p dir="auto">lazyAttr</p>
+<p dir="auto"><code>"lazyAttr": "data-lazy"</code></p>
+<p dir="auto">Lazy loaded original image URL attribute name</p>
+</li>
+<li>
+<p dir="auto">xhr</p>
+<p dir="auto"><code>"xhr": { "url": ".showcase__link", "query": "img[fetchpriority]" }</code></p>
+<p dir="auto">Fetch the link above the image that matches ".showcase__link" and query the "img[fetchpriority]" on the inner page from the link.</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p dir="auto">JS (full mode)</p>
+<p dir="auto">These rules are written in JavaScript object format. If you are not using a standalone userscript, they may be limited by websites that have a strict Content Security Policy that disallows unsafe-eval.</p>
+<ul dir="auto">
+<li>JS params
+<ul dir="auto">
+<li>all mentioned above and the function type instead of string type</li>
+<li>getImage</li>
+<li>getExtSrc</li>
+</ul>
+</li>
+</ul>
+<p dir="auto">Learn from <a href="https://github.com/hoothin/UserScripts/blob/master/Picviewer%20CE%2B/pvcep_rules.js">https://github.com/hoothin/UserScripts/blob/master/Picviewer%20CE%2B/pvcep_rules.js</a></p>
+</li>
+</ul>
+ </details>
+
+## Custom download filenames
+
+In settings, **Image file naming** chooses between the original filename (from the image URL), the image description (usually title/alt), or both. **Prefix filenames with the page title** adds the page title.
+
+A site rule can override both settings with `saveName`. Use a template for a fixed artist name:
+
+```json
+{
+    "name": "My artist",
+    "url": "^https://example\\.com/",
+    "saveName": "my-artist-{filename}"
+}
+```
+
+Templates accept `{url}`, `{pageUrl}`, `{linkUrl}`, `{title}`, `{filename}` and `{description}`. For example, `my-artist-{filename}` saves `photo.jpg` as `my-artist-photo.jpg`.
+
+For URL extraction, add a synchronous function to a JavaScript rule in the standalone custom-rule userscript shown above (functions cannot be written in JSON):
+
+```js
+{
+    name: "Artist from URL",
+    url: /^https:\/\/example\.com\//,
+    saveName: ({ linkUrl, pageUrl, filename }) => {
+        const artist = new URL(linkUrl || pageUrl).pathname.match(/\/users\/([^/]+)/);
+        return artist ? artist[1] + "-" + filename : "";
+    }
+}
+```
+
+For a query parameter such as `?user_id=12345`, replace the function with:
+
+```js
+saveName: ({ pageUrl, filename }) => {
+    const uid = new URL(pageUrl).searchParams.get("user_id");
+    return uid ? uid + "-" + filename : "";
+}
+```
+
+| Field | Value passed to the function |
+| --- | --- |
+| `url` | Image URL being downloaded |
+| `pageUrl` | Page URL recorded when the image was collected |
+| `linkUrl` | Link surrounding the original image, or an empty string |
+| `img` | Original image element, or `null` if unavailable |
+| `title` | Source page title |
+| `filename` | Original filename without extension; defaults to `image` |
+| `description` | Image description from the rule or title/alt |
+
+Specify `url` for a site naming rule, or reuse an existing rule's `name` to inherit its URL match. Invalid filename characters are removed and the image extension is added automatically. Empty results, invalid return values and errors fall back to the global settings. Batch downloads add a sequence number to prevent duplicate names in ZIP files.
+
+URL extraction only uses the provided URLs; it makes no extra requests. For sites such as X, a numeric UID can only be extracted if it is already present in one of those URLs. Use a fixed custom prefix otherwise.
+
+
+## Blank Gallery Page
+[https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html](https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html)
+
+> *A blank gallery page designed for viewing local or online pictures, showcasing every image you have imported.*
+
+You can drag and drop **folders** or videos/audios/images into this gallery to get an electronic slideshow to view them.
+
+Click with `Ctrl key` can import folder too.
+
+Include `mode=`*`1`* to open gallery in view-more mode.<br/>
+Add `imgs=`*`http://xxx/xxx.jpg`* to import images. ` ` to split multi-image, `[01-09]` to generate nine urls form 01 to 09<br/>
+For example: 
+```url
+https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html?mode=0&imgs=http://xxx/xxx[01-99].jpg
+or
+https://hoothin.github.io/UserScripts/Picviewer%20CE+/gallery.html?mode=0&imgs=${encodeURIComponent(IMG1 + ' ' + IMG2)}
+```
+
+<img src='https://v2fy.com/asset/063_picviewer_ce/72723103-d911ce00-3bba-11ea-9541-0be746977dbc.gif' width=325><img src='https://v2fy.com/asset/063_picviewer_ce/72767872-7eb35480-3c30-11ea-814d-ce4678c81089.gif' width=325><img src='https://v2fy.com/asset/063_picviewer_ce/73130353-c4598e00-4031-11ea-810e-9498677a40d1.gif' width=325>
+
+## Thousands compatible sites for find larger or original images like
+
 deviantart.com
 google.com
 wikipedia.org

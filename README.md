@@ -1,38 +1,51 @@
-Greasemonkey scripts 油猴腳本集
-==========================
-https://greasyfork.org/users/8227-hoothin
+<h1 align="center">⚙️<a href="https://hoothin.github.io/UserScripts/">Greasemonkey scripts</a></h1>
+
+<p align="center">
+  <a href="https://github.com/hoothin/UserScripts"><img src="https://img.shields.io/badge/License-MIT-red.svg" alt="license"></a>
+  <a href="https://github.com/hoothin/UserScripts"><img src="https://img.shields.io/badge/Support-Chrome|Firefox|Edge-blue.svg" alt="Support"></a>
+  <a href="mailto:rixixi@gmail.com"><img src="https://img.shields.io/badge/Contact-Gmail-yellow.svg" alt="Contact"></a>
+</p>
 
 ---
-+ [Easy offline 一鍵離綫下載](Easy%20offline)
+
++ [Pagetual · 東方永頁機](https://pagetual.hoothin.com/ "Auto pager script to fetch next page automatically for infinity scroll. Pagetual 東方永頁機 东方永页机")
+
++ [SearchJumper · 搜尋醬](https://search.hoothin.com/ "Conduct searches for selected text/image effortlessly. Navigate to any search engine(Google/Bing/Custom) swiftly. SearchJumper 搜索酱 搜尋醬")
+
++ [Easy offline · 一鍵離綫下載](Easy%20offline "Find out all magnet links and torrents and video links in current page, and stream them from cloud storage automatically.")
+
++ [Picviewer CE+](Picviewer%20CE%2B "Powerful picture viewing tool online, which can popup/scale/rotate/batch save pictures automatically.")
+
++ [Switch Traditional Chinese and Simplified Chinese · 簡繁自由切換](Switch%20Traditional%20Chinese%20and%20Simplified%20Chinese "Convert between simplified and traditional Chinese characters on any webpage, display the Pinyin for the Chinese characters, customize text replacement.")
+
++ [Greasyfork Search with Sleazyfork Results include · 大人的Greasyfork](Greasyfork%20Search%20with%20Sleazyfork%20Results%20include "Merge adult results of sleazyfork into greasyfork when the script is no longer anonymously available, add rating score and version for scripts then.")
+
++ [DownloadAllContent · 怠惰小說下載器](DownloadAllContent "Lightweight web scraping script. Fetch and download main textual content from the current page, provide special support for novels.")
+
++ [HGT Decode · 琉神轉](HacgGodTurn)
+
++ [Select All Checkboxes · 多選框伴侶](Select%20All%20Checkboxes)
+
++ [MoreSteamRatings · Steam遊戲評分集](MoreSteamRatings)
+
++ [Highlight Every Code · 程式碼片段高亮](Highlight%20Every%20Code)
 
 + [True URL downloads](True%20URL%20downloads)
 
-+ [琉神轉](HacgGodTurn)
++ [JandanHero · 煎蛋俠](JiandanHero)
 
-+ [Picviewer CE+](Picviewer%20CE%2B)
+## Contributors
 
-+ [Kill Baidu AD 百度廣告(首尾推廣及右側廣告)清理](Kill%20Baidu%20AD)
+<a href="https://github.com/hoothin/UserScripts/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=hoothin/UserScripts&max=13&columns=13" />
+</a>
 
-+ [Kill TieBa AD 貼吧偽裝廣告清理](Kill%20TieBa%20AD)
+## Star History
 
-+ [Select All Checkboxes 多選框伴侶](Select%20All%20Checkboxes)
-
-+ [MoreSteamRatings Steam遊戲評分集](MoreSteamRatings)
-
-+ [Highlight Every Code 代碼片段高亮](Highlight%20Every%20Code)
-
-+ [Switch Traditional Chinese and Simplified Chinese 簡繁自由切換](Switch%20Traditional%20Chinese%20and%20Simplified%20Chinese)
-
-+ [Greasyfork Search with Sleazyfork Results include 大人的Greasyfork](Greasyfork%20Search%20with%20Sleazyfork%20Results%20include)
-
-+ [DownloadAllContent 怠惰小說下載器](DownloadAllContent)
-
-+ [Disable AD of ThisAV ThisAV去廣告](Disable%20AD%20of%20ThisAV)
-
-+ [JandanHero 煎蛋俠](JiandanHero)
-
-+ [Pagetual 東方永頁機](Pagetual)
-
-+ [SearchJumper 搜索醬](https://github.com/hoothin/SearchJumper)
-
----
+<a href="https://www.star-history.com/?repos=hoothin%2FUserScripts&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=hoothin/UserScripts&type=date&theme=dark&legend=top-left&sealed_token=iCwYj-Gtf9RxJRAIVS5ivZTU664ZHacpQ68jfTeUcXf5LnGbP09n99T3Av7_pdVnQtLfubl0pp_5zKqxrHD8r0WdR1EYD4-r5OfiqxvgcjvMMvgvJK5hQQ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=hoothin/UserScripts&type=date&legend=top-left&sealed_token=iCwYj-Gtf9RxJRAIVS5ivZTU664ZHacpQ68jfTeUcXf5LnGbP09n99T3Av7_pdVnQtLfubl0pp_5zKqxrHD8r0WdR1EYD4-r5OfiqxvgcjvMMvgvJK5hQQ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=hoothin/UserScripts&type=date&legend=top-left&sealed_token=iCwYj-Gtf9RxJRAIVS5ivZTU664ZHacpQ68jfTeUcXf5LnGbP09n99T3Av7_pdVnQtLfubl0pp_5zKqxrHD8r0WdR1EYD4-r5OfiqxvgcjvMMvgvJK5hQQ" />
+ </picture>
+</a>

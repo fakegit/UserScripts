@@ -2,27 +2,32 @@
 // @name                 Picviewer CE+
 // @name:zh-CN           Picviewer CE+
 // @name:zh-TW           Picviewer CE+
+// @name:ja              Picviewer CE+
 // @name:pt-BR           Picviewer CE+
 // @name:ru              Picviewer CE+
 // @author               NLF && ywzhaiqi && hoothin
 // @description          Powerful picture viewing tool online, which can popup/scale/rotate/batch save pictures automatically
 // @description:zh-CN    在线看图工具，支持图片翻转、旋转、缩放、弹出大图、批量保存
 // @description:zh-TW    線上看圖工具，支援圖片翻轉、旋轉、縮放、彈出大圖、批量儲存
+// @description:ja       画像を強力に閲覧できるツール。ポップアップ表示、拡大・縮小、回転、一括保存などの機能を自動で実行できます
 // @description:pt-BR    Poderosa ferramenta de visualização de imagens on-line, que pode pop-up/dimensionar/girar/salvar em lote imagens automaticamente
 // @description:ru       Мощный онлайн-инструмент для просмотра изображений, который может автоматически отображать/масштабировать/вращать/пакетно сохранять изображения
-// @version              2022.6.2.1
+// @version              2026.9.29.1
 // @icon                 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAV1BMVEUAAAD////29vbKysoqKioiIiKysrKhoaGTk5N9fX3z8/Pv7+/r6+vk5OTb29vOzs6Ojo5UVFQzMzMZGRkREREMDAy4uLisrKylpaV4eHhkZGRPT08/Pz/IfxjQAAAAgklEQVQoz53RRw7DIBBAUb5pxr2m3/+ckfDImwyJlL9DDzQgDIUMRu1vWOxTBdeM+onApENF0qHjpkOk2VTwLVEF40Kbfj1wK8AVu2pQA1aBBYDHJ1wy9Cf4cXD5chzNAvsAnc8TjoLAhIzsBao9w1rlVTIvkOYMd9nm6xPi168t9AYkbANdajpjcwAAAABJRU5ErkJggg==
 // @namespace            https://github.com/hoothin/UserScripts
-// @homepage             http://hoothin.com
+// @homepage             https://pv.hoothin.com/
+// @supportURL           https://github.com/hoothin/UserScripts/issues
 // @connect              www.google.com
 // @connect              www.google.com.hk
 // @connect              www.google.co.jp
 // @connect              ipv4.google.com
 // @connect              image.baidu.com
 // @connect              www.tineye.com
+// @connect              hoothin.com
 // @connect              *
 // @grant                GM_getValue
 // @grant                GM_setValue
+// @grant                GM_deleteValue
 // @grant                GM_addStyle
 // @grant                GM_openInTab
 // @grant                GM_setClipboard
@@ -32,6 +37,7 @@
 // @grant                GM_download
 // @grant                GM.getValue
 // @grant                GM.setValue
+// @grant                GM.deleteValue
 // @grant                GM.addStyle
 // @grant                GM.openInTab
 // @grant                GM.setClipboard
@@ -39,19 +45,32 @@
 // @grant                GM.registerMenuCommand
 // @grant                GM.notification
 // @grant                unsafeWindow
-// @require              https://greasyfork.org/scripts/6158-gm-config-cn/code/GM_config%20CN.js?version=23710
-// @require              https://greasyfork.org/scripts/438080-pvcep-rules/code/pvcep_rules.js?version=1053702
-// @require              https://greasyfork.org/scripts/440698-pvcep-lang/code/pvcep_lang.js?version=1050741
+// @require              https://update.greasyfork.org/scripts/6158/23710/GM_config%20CN.js
+// @require              https://update.greasyfork.org/scripts/438080/1945644/pvcep_rules.js
+// @require              https://update.greasyfork.org/scripts/440698/1945643/pvcep_lang.js
 // @match                *://*/*
 // @exclude              http://www.toodledo.com/tasks/*
 // @exclude              http*://maps.google.com*/*
 // @exclude              *://www.google.*/_/chrome/newtab*
 // @exclude              *://mega.*/*
 // @exclude              *://*.mega.*/*
+// @exclude              *://onedrive.live.com/*
+// @exclude              *://teams.live.com/*
+// @run-at               document-end
 // @created              2011-6-15
-// @contributionURL      https://www.buymeacoffee.com/hoothin
+// @contributionURL      https://ko-fi.com/hoothin
 // @contributionAmount   1
 // ==/UserScript==
+
+if (window.top != window.self) {
+    try {
+        if ((window.self.innerWidth && window.self.innerWidth < 250) || (window.self.innerHeight && window.self.innerHeight < 250)) {
+            return;
+        }
+    } catch(e) {
+        return;
+    }
+}
 
 (function (global, factory) {
   if (typeof define === "function" && define.amd) {
@@ -144,6 +163,9 @@
 
 
   var isMacOSWebView = _global.navigator && /Macintosh/.test(navigator.userAgent) && /AppleWebKit/.test(navigator.userAgent) && !/Safari/.test(navigator.userAgent);
+  var URL = _global.URL || _global.webkitURL;
+  var revokeObjectURL = URL.revokeObjectURL;
+  var createObjectURL = URL.createObjectURL;
   var saveAs = _global.saveAs || ( // probably in some web worker
   typeof window !== 'object' || window !== _global ? function saveAs() {}
   /* noop */
@@ -168,9 +190,9 @@
       }
     } else {
       // Support blobs
-      a.href = URL.createObjectURL(blob);
+      a.href = createObjectURL(blob);
       setTimeout(function () {
-        URL.revokeObjectURL(a.href);
+        revokeObjectURL(a.href);
       }, 4E4); // 40s
 
       setTimeout(function () {
@@ -225,13 +247,12 @@
 
       reader.readAsDataURL(blob);
     } else {
-      var URL = _global.URL || _global.webkitURL;
-      var url = URL.createObjectURL(blob);
+      var url = createObjectURL(blob);
       if (popup) popup.location = url;else location.href = url;
       popup = null; // reverse-tabnabbing #460
 
       setTimeout(function () {
-        URL.revokeObjectURL(url);
+        revokeObjectURL(url);
       }, 4E4); // 40s
     }
   });
@@ -1983,9 +2004,9 @@ var utils = require('../utils');
 
 function ArrayReader(data) {
     DataReader.call(this, data);
-    for(var i = 0; i < this.data.length; i++) {
-        data[i] = data[i] & 0xFF;
-    }
+  for(var i = 0; i < this.data.length; i++) {
+    data[i] = data[i] & 0xFF;
+  }
 }
 utils.inherits(ArrayReader, DataReader);
 /**
@@ -11604,21 +11625,308 @@ module.exports = ZStream;
 },{}],54:[function(require,module,exports){
 'use strict';
 module.exports = typeof setImmediate === 'function' ? setImmediate :
-    function setImmediate() {
-        var args = [].slice.apply(arguments);
-        args.splice(1, 0, 0);
-        setTimeout.apply(null, args);
-    };
+  function setImmediate() {
+    var args = [].slice.apply(arguments);
+    args.splice(1, 0, 0);
+    setTimeout.apply(null, args);
+  };
 
 },{}]},{},[10])(10)
 });
+
+//Bricks.js MIT. © 2017 Michael Cavalea
+(function (global, factory) {
+  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+  typeof define === 'function' && define.amd ? define(factory) :
+  (global.Bricks = factory());
+}(this, (function () { 'use strict';
+
+var _extends = Object.assign || function (target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i];
+
+    for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+
+  return target;
+};
+
+var knot = function knot() {
+  var extended = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  var events = Object.create(null);
+
+  function on(name, handler) {
+    events[name] = events[name] || [];
+    events[name].push(handler);
+    return this;
+  }
+
+  function once(name, handler) {
+    handler._once = true;
+    on(name, handler);
+    return this;
+  }
+
+  function off(name) {
+    var handler = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+
+    handler ? events[name].splice(events[name].indexOf(handler), 1) : delete events[name];
+
+    return this;
+  }
+
+  function emit(name) {
+    var _this = this;
+
+    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+      args[_key - 1] = arguments[_key];
+    }
+
+    // cache the events, to avoid consequences of mutation
+    var cache = events[name] && events[name].slice();
+
+    // only fire handlers if they exist
+    cache && cache.forEach(function (handler) {
+      // remove handlers added with 'once'
+      handler._once && off(name, handler);
+
+      // set 'this' context, pass args to handlers
+      handler.apply(_this, args);
+    });
+
+    return this;
+  }
+
+  return _extends({}, extended, {
+
+    on: on,
+    once: once,
+    off: off,
+    emit: emit
+  });
+};
+
+var bricks = function bricks() {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  // privates
+
+  var persist = void 0; // packing new elements, or all elements?
+  var ticking = void 0; // for debounced resize
+
+  var sizeIndex = void 0;
+  var sizeDetail = void 0;
+
+  var columnTarget = void 0;
+  var columnHeights = void 0;
+
+  var nodeTop = void 0;
+  var nodeLeft = void 0;
+  var nodeWidth = void 0;
+  var nodeHeight = void 0;
+
+  var nodes = void 0;
+  var nodesWidths = void 0;
+  var nodesHeights = void 0;
+
+  // resolve options
+
+  var packed = options.packed.indexOf('data-') === 0 ? options.packed : 'data-' + options.packed;
+  var sizes = options.sizes.slice().reverse();
+  var position = options.position !== false;
+
+  var container = options.container.nodeType ? options.container : document.querySelector(options.container);
+
+  var selectors = {
+    all: function all() {
+      return toArray(container.children);
+    },
+    new: function _new() {
+      return toArray(container.children).filter(function (node) {
+        return !node.hasAttribute('' + packed);
+      });
+    }
+  };
+
+  // series
+
+  var setup = [setSizeIndex, setSizeDetail, setColumns];
+
+  var run = [setNodes, setNodesDimensions, setNodesStyles, setContainerStyles];
+
+  // instance
+
+  var instance = knot({
+    pack: pack,
+    update: update,
+    resize: resize
+  });
+
+  return instance;
+
+  // general helpers
+
+  function runSeries(functions) {
+    functions.forEach(function (func) {
+      return func();
+    });
+  }
+
+  // array helpers
+
+  function toArray(input) {
+    var scope = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : document;
+
+    return Array.prototype.slice.call(input);
+  }
+
+  function fillArray(length) {
+    return Array.apply(null, Array(length)).map(function () {
+      return 0;
+    });
+  }
+
+  // size helpers
+
+  function getSizeIndex() {
+    // find index of widest matching media query
+    return sizes.map(function (size) {
+      return size.mq && window.matchMedia('(min-width: ' + size.mq + ')').matches;
+    }).indexOf(true);
+  }
+
+  function setSizeIndex() {
+    sizeIndex = getSizeIndex();
+  }
+
+  function setSizeDetail() {
+    // if no media queries matched, use the base case
+    sizeDetail = sizeIndex === -1 ? sizes[sizes.length - 1] : sizes[sizeIndex];
+  }
+
+  // column helpers
+
+  function setColumns() {
+    columnHeights = fillArray(sizeDetail.columns);
+  }
+
+  // node helpers
+
+  function setNodes() {
+    nodes = selectors[persist ? 'new' : 'all']();
+  }
+
+  function setNodesDimensions() {
+    // exit if empty container
+    if (nodes.length === 0) {
+      return;
+    }
+
+    nodesWidths = nodes.map(function (element) {
+      return element.clientWidth;
+    });
+    nodesHeights = nodes.map(function (element) {
+      return element.clientHeight;
+    });
+  }
+
+  function setNodesStyles() {
+    nodes.forEach(function (element, index) {
+      columnTarget = columnHeights.indexOf(Math.min.apply(Math, columnHeights));
+
+      element.style.position = 'absolute';
+
+      nodeTop = columnHeights[columnTarget] + 'px';
+      nodeLeft = columnTarget * nodesWidths[index] + columnTarget * sizeDetail.gutter + 'px';
+
+      // support positioned elements (default) or transformed elements
+      if (position) {
+        element.style.top = nodeTop;
+        element.style.left = nodeLeft;
+      } else {
+        element.style.transform = 'translate3d(' + nodeLeft + ', ' + nodeTop + ', 0)';
+      }
+
+      element.setAttribute(packed, '');
+
+      // ignore nodes with no width and/or height
+      nodeWidth = nodesWidths[index];
+      nodeHeight = nodesHeights[index];
+
+      if (nodeWidth && nodeHeight) {
+        columnHeights[columnTarget] += nodeHeight + sizeDetail.gutter;
+      }
+    });
+  }
+
+  // container helpers
+
+  function setContainerStyles() {
+    container.style.position = 'relative';
+    container.style.width = sizeDetail.columns * nodeWidth + (sizeDetail.columns - 1) * sizeDetail.gutter + 'px';
+    container.style.height = Math.max.apply(Math, columnHeights) - sizeDetail.gutter + 'px';
+  }
+
+  // resize helpers
+
+  function resizeFrame() {
+    if (!ticking) {
+      window.requestAnimationFrame(resizeHandler);
+      ticking = true;
+    }
+  }
+
+  function resizeHandler() {
+    if (sizeIndex !== getSizeIndex()) {
+      pack();
+      instance.emit('resize', sizeDetail);
+    }
+
+    ticking = false;
+  }
+
+  // API
+
+  function pack() {
+    persist = false;
+    runSeries(setup.concat(run));
+
+    return instance.emit('pack');
+  }
+
+  function update() {
+    persist = true;
+    runSeries(run);
+
+    return instance.emit('update');
+  }
+
+  function resize() {
+    var flag = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
+
+    var action = flag ? 'addEventListener' : 'removeEventListener';
+
+    window[action]('resize', resizeFrame);
+
+    return instance;
+  }
+};
+
+return bricks;
+
+})));
 
 var floatBar;
 ;(function(topObject,window,document,unsafeWindow){
     'use strict';
 
     //var siteInfo = [{}];
-    var debug;
+    var debug = console.log.bind(console);
     var lang;
     function initLang(){
         let customLang=storage.getItem("customLang")||'auto';
@@ -11636,7 +11944,7 @@ var floatBar;
         }
         return result?result:key;
     }
-    var defaultSearchData=`Google | https://www.google.com/searchbyimage?image_url=#t#
+    var defaultSearchData=`Google | https://www.google.com/searchbyimage?safe=off&sbisrc=1&image_url=#t#
 Yandex | https://yandex.com/images/search?source=collections&rpt=imageview&url=#t#
 SauceNAO | https://saucenao.com/search.php?db=999&url=#t#
 IQDB | https://iqdb.org/?url=#t#
@@ -11646,14 +11954,15 @@ Bing | https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIVSP&sbis
 TinEye | https://www.tineye.com/search?url=#t#
 Sogou | https://pic.sogou.com/ris?query=#t#
 360 | http://st.so.com/stu?imgurl=#t#
-WhatAnime | https://trace.moe/?url=#t#
 Ascii2D | https://ascii2d.net/search/url/#t#
 Trace Moe | https://trace.moe/?url=#t#
 KarmaDecay | http://karmadecay.com/#t#
-ZXing QRCode | https://zxing.org/w/decode?full=true&u=#t#
+QRCode | https://hoothin.com/qrcode/##t#
+QRdecode1 | https://zxing.org/w/decode?full=true&u=#t#
+QRdecode2 | https://hoothin.com/qrdecode/##t#
 ImgOps | https://imgops.com/#b#`;
 
-    var _GM_openInTab,_GM_setClipboard,_GM_xmlhttpRequest,_GM_registerMenuCommand,_GM_notification;
+    var _GM_openInTab,_GM_setClipboard,_GM_xmlhttpRequest,_GM_registerMenuCommand,_GM_notification,GM_fetch,_GM_addStyle;
     if(typeof GM_openInTab!='undefined'){
         _GM_openInTab=GM_openInTab;
     }else if(typeof GM!='undefined' && typeof GM.openInTab!='undefined'){
@@ -11667,13 +11976,6 @@ ImgOps | https://imgops.com/#b#`;
         _GM_setClipboard=GM.setClipboard;
     }else{
         _GM_setClipboard=(s)=>{};
-    }
-    if(typeof GM_xmlhttpRequest!='undefined'){
-        _GM_xmlhttpRequest=GM_xmlhttpRequest;
-    }else if(typeof GM!='undefined' && typeof GM.xmlHttpRequest!='undefined'){
-        _GM_xmlhttpRequest=GM.xmlHttpRequest;
-    }else{
-        _GM_xmlhttpRequest=(f)=>{fetch(f.url).then(response=>response.text()).then(data=>{let res={response:data};f.onload(res)}).catch(f.onerror())};
     }
     if(typeof GM_registerMenuCommand!='undefined'){
         _GM_registerMenuCommand=GM_registerMenuCommand;
@@ -11689,23 +11991,961 @@ ImgOps | https://imgops.com/#b#`;
     }else{
         _GM_notification=(s)=>{alert(s)};
     }
-    var _GM_download=(typeof GM_download=='undefined')?(src,name)=>{saveAs(src,encodeURIComponent(name))}:(src,name)=>{GM_download(src,encodeURIComponent(name))};
-    var prefs;
-    var escapeHTMLPolicy;
-    if (unsafeWindow.trustedTypes && unsafeWindow.trustedTypes.createPolicy) {
-        escapeHTMLPolicy=unsafeWindow.trustedTypes.createPolicy('default', {
-            createHTML: (string, sink) => string
+    if (typeof GM_xmlhttpRequest != 'undefined') {
+        _GM_xmlhttpRequest = GM_xmlhttpRequest;
+        GM_fetch = true;
+    } else if (typeof GM != 'undefined' && typeof GM.xmlHttpRequest != 'undefined') {
+        _GM_xmlhttpRequest = GM.xmlHttpRequest;
+        GM_fetch = true;
+    } else {
+        _GM_xmlhttpRequest = (f) => {fetch(f.url, (f.method && f.method !== 'GET' ? {method: f.method || 'GET', body: f.data || '', headers: f.headers} : {method: 'GET', headers: f.headers})).then(response => response.text()).then(data => {f.onload({response: data})}).catch(e => f.onerror())};
+    }
+    if (typeof GM_addStyle != 'undefined') {
+        _GM_addStyle = GM_addStyle;
+    } else if (typeof GM != 'undefined' && typeof GM.addStyle != 'undefined') {
+        _GM_addStyle = GM.addStyle;
+    } else {
+        _GM_addStyle = cssStr => {
+            let styleEle = document.createElement("style");
+            styleEle.innerHTML = cssStr;
+            document.head.appendChild(styleEle);
+            return styleEle;
+        };
+    }
+    if (GM_fetch) {
+        GM_fetch = async (url, option) => {
+            if (!url) return null;
+            return new Promise((resolve, reject) => {
+                let isPost = option && /^post$/i.test(option.method);
+                _GM_xmlhttpRequest({
+                    method: (option && option.method) || 'GET',
+                    url: url.trim(),
+                    data: (option && option.body) || '',
+                    cookie: cookie,
+                    headers: (option && option.headers) || {
+                        referer: url,
+                        origin: url,
+                        "Content-Type": (isPost ? "application/x-www-form-urlencoded" : "text/html"),
+                        'X-Requested-With': (isPost ? 'XMLHttpRequest' : '')
+                    },
+                    onload: function(d) {
+                        let response = d.response;
+                        if (d.status >= 400 || !response) response = "";
+                        let text = () => new Promise((r) => {
+                            r(response);
+                        });
+                        let json = () => new Promise((r) => {
+                            try {
+                                r(JSON.parse(response));
+                            } catch (e) {
+                                r(null);
+                            }
+                        });
+                        resolve({text: text, json: json, finalUrl: (d.finalUrl || url)});
+                    },
+                    onerror: function(e) {
+                        debug(e);
+                        reject(e);
+                    },
+                    ontimeout: function(e) {
+                        debug(e);
+                        reject(e);
+                    }
+                });
+            });
+        }
+    } else GM_fetch = fetch;
+
+    class ImageSizeFetcher {
+        constructor(gmXhr, config = {}) {
+            if (!gmXhr) throw new Error("GM_xmlhttpRequest is required");
+            this.gmXhr = gmXhr;
+            this.cache = new Map();
+            this.queue = [];
+            this.activeCount = 0;
+            this.concurrency = config.concurrency || 3;
+            this.timeout = config.timeout || 5000;
+        }
+
+        async getSize(url, options = {}) {
+            const { force = false, strategy = 'auto' } = options;
+            if (!url) return null;
+
+            if (!force && this.cache.has(url)) {
+                return this.cache.get(url);
+            }
+
+            if (url.startsWith('data:')) {
+                const size = this._calculateBase64Size(url);
+                this.cache.set(url, size);
+                return size;
+            }
+
+            if (url.startsWith('blob:')) {
+                return this._getBlobSize(url);
+            }
+
+            if (strategy === 'local-only' || strategy === 'auto') {
+                const perfSize = this._getFromPerformance(url);
+                if (perfSize !== null) {
+                    this.cache.set(url, perfSize);
+                    return perfSize;
+                }
+                if (strategy === 'local-only') return null;
+            }
+
+            return this._scheduleRequest(url);
+        }
+
+        _calculateBase64Size(dataUrl) {
+            const base64Str = dataUrl.split(',')[1];
+            if (!base64Str) return 0;
+            const len = base64Str.length;
+            const padding = (base64Str.match(/=/g) || []).length;
+            return (len * 3 / 4) - padding;
+        }
+
+        async _getBlobSize(blobUrl) {
+            try {
+                const response = await fetch(blobUrl);
+                const blob = await response.blob();
+                return blob.size;
+            } catch (e) {
+                console.error('Blob fetch failed', e);
+                return null;
+            }
+        }
+
+        _getFromPerformance(url) {
+            const entries = performance.getEntriesByName(url);
+            if (entries.length > 0) {
+                const entry = entries[entries.length - 1];
+                if (entry.decodedBodySize > 0) return entry.decodedBodySize;
+                if (entry.encodedBodySize > 0) return entry.encodedBodySize;
+            }
+            return null;
+        }
+
+        _scheduleRequest(url) {
+            return new Promise((resolve, reject) => {
+                this.queue.push({ url, resolve, reject });
+                this._processQueue();
+            });
+        }
+
+        _processQueue() {
+            if (this.activeCount >= this.concurrency || this.queue.length === 0) {
+                return;
+            }
+
+            this.activeCount++;
+            const { url, resolve, reject } = this.queue.shift();
+
+            this._fetchByHead(url)
+                .then(size => {
+                    if (size !== null) this.cache.set(url, size);
+                    resolve(size);
+                })
+                .catch(err => {
+                    console.warn(`Fetch size failed for ${url}`, err);
+                    resolve(null);
+                })
+                .finally(() => {
+                    this.activeCount--;
+                    this._processQueue();
+                });
+        }
+
+        _fetchByHead(url) {
+            return new Promise((resolve, reject) => {
+                this.gmXhr({
+                    method: "HEAD",
+                    url: url,
+                    timeout: this.timeout,
+                    onload: (response) => {
+                        const lenStr = response.responseHeaders.match(/content-length:\s*(\d+)/i);
+                        if (lenStr && lenStr[1]) {
+                            resolve(parseInt(lenStr[1], 10));
+                        } else {
+                            resolve(null);
+                        }
+                    },
+                    onerror: (err) => reject(err),
+                    ontimeout: () => reject(new Error("Timeout"))
+                });
+            });
+        }
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === null || typeof bytes === "undefined" || isNaN(bytes) || bytes < 0) return "";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        let size = bytes;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        const precision = size >= 100 ? 0 : (size >= 10 ? 1 : 2);
+        const value = size.toFixed(precision).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, "$1");
+        return value + " " + units[unitIndex];
+    }
+
+    function updateGalleryHeaderSize(gallery, img, strategy) {
+        if (!gallery || !gallery.eleMaps || !gallery.eleMaps['head-left-img-info-size']) return;
+        const sizeSpan = gallery.eleMaps['head-left-img-info-size'];
+        sizeSpan.textContent = "";
+        sizeSpan.title = "";
+        if (!img || img.nodeName !== 'IMG') return;
+        const sizeUrl = img.src;
+        if (!sizeUrl) return;
+        imageSizeFetcher.getSize(sizeUrl, { strategy: strategy || 'auto' }).then(size => {
+            if (size === null) return;
+            if (gallery.img !== img || img.src !== sizeUrl) return;
+            if (img.naturalWidth && img.naturalHeight) {
+                gallery.eleMaps['head-left-img-info-resolution'].textContent = img.naturalWidth + " x " + img.naturalHeight;
+            }
+            const sizeText = formatBytes(size);
+            sizeSpan.textContent = "(" + sizeText + ")";
+            sizeSpan.title = sizeText;
         });
     }
 
-    function createHTML(html){
-        return escapeHTMLPolicy?escapeHTMLPolicy.createHTML(html):html;
+    function updateViewmoreSizeLabel(labelNode, baseText, url, strategy, baseTextGetter) {
+        if (!labelNode || !url) return;
+        const initText = typeof baseTextGetter === "function" ? baseTextGetter() : baseText;
+        labelNode.textContent = initText;
+        imageSizeFetcher.getSize(url, { strategy: strategy || 'local-only' }).then(size => {
+            if (size === null) return;
+            const sizeText = formatBytes(size);
+            const currentBase = typeof baseTextGetter === "function" ? baseTextGetter() : baseText;
+            labelNode.textContent = currentBase + " | " + sizeText;
+        });
     }
-    function init(topObject,window,document,arrayFn,envir,storage,unsafeWindow){
+
+    var viewmoreAutoSizeThrottle = { last: 0 };
+    function scheduleViewmoreAutoSize(labelNode, baseText, url, baseTextGetter) {
+        if (!labelNode || !url) return;
+        var now = Date.now();
+        var delay = Math.max(0, 800 - (now - viewmoreAutoSizeThrottle.last));
+        setTimeout(() => {
+            viewmoreAutoSizeThrottle.last = Date.now();
+            updateViewmoreSizeLabel(labelNode, baseText, url, 'auto', baseTextGetter);
+        }, delay);
+    }
+
+    var imageSizeFetcher = new ImageSizeFetcher(_GM_xmlhttpRequest, { concurrency: 3, timeout: 5000 });
+
+    var canvas = document.createElement('CANVAS');
+    if (document.body) {
+        if (canvas.style) canvas.style.display = "none";
+        document.body.appendChild(canvas);
+        if (typeof canvas.getContext === 'undefined') {
+            document.body.removeChild(canvas);
+            canvas = null;
+        } else {
+            document.body.removeChild(canvas);
+        }
+    }
+    var formatDict = new Map();
+    function icon2Base64(icon, content, iconStyle) {
+        if (!content || !canvas) return false;
+        let size = Math.min((icon.clientWidth || icon.offsetWidth), (icon.clientHeight || icon.offsetHeight));
+        if (!size) return false;
+        canvas.width = size;
+        canvas.height = size;
+        var ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = iconStyle.font || (iconStyle.fontSize + " " + iconStyle.fontFamily);
+        ctx.strokeStyle = iconStyle.color || "black";
+        ctx.fillStyle = iconStyle.color || "black";
+        ctx.textBaseline = "top";
+        let metrics = ctx.measureText(content);
+        ctx.fillText(content, (canvas.width - metrics.width) / 2, (canvas.height - parseInt(iconStyle.fontSize)) / 2);
+        return canvas.toDataURL("image/png");
+    }
+
+    function getRightSaveName(url, name, type, _ext) {
+        /*
+         0: i18n("default"),
+         1: i18n("textFirst"),
+         2: i18n("onlyUrl"),
+         3: i18n("urlAndText")
+        */
+        type = parseInt(type || 0);
+        if (name) name = name.split("\n")[0].replace(/.*?\/\/[^\/]+\//, "").replace(/\?.*/, "").replace(/^data:.*/, "");
+        if (!url.replace || url.indexOf("data:") === 0) url = "";
+        url = url.replace(/.*?\/\/[^\/]+\//, "");
+        let nameFromUrl = url.match(/.*?([^\/\?\=\&]+)\.\w{2,5}(\?|@|$).*/, "$1");
+        nameFromUrl = nameFromUrl ? nameFromUrl[1] : "";
+        if (/\=&/.test(nameFromUrl)) {
+            nameFromUrl = "";
+        } else {
+            try {
+                nameFromUrl = decodeURIComponent(nameFromUrl);
+            } catch (e) {}
+        }
+        let ext;
+        if (_ext && /^\w{2,5}$/.test(_ext)) {
+            ext = "." + _ext;
+        } else {
+            ext = url.match(/(\.\w{2,5})(\?|@|$)/);
+            if (ext) {
+                ext = ext[1];
+            }
+        }
+        switch (type) {
+            case 1:
+                name = (name || nameFromUrl || "image").substr(-200);
+                break;
+            case 2:
+                name = (nameFromUrl || url || "image").substr(-200);
+                break;
+            case 3:
+                if (nameFromUrl && !name) {
+                    name = nameFromUrl.substr(-200);
+                } else if (nameFromUrl && name) {
+                    name = nameFromUrl.substr(-200) + " - " + name.substr(-200);
+                } else if (!nameFromUrl && !name) {
+                    name = "image";
+                }
+                break;
+            default:
+                name = (nameFromUrl || name || "image").substr(-200);
+                break;
+        }
+        return name.replace(/.*?\/([^\/\?]+?)(\?|@|$).*/, "$1").replace(/[\*\/:<>\?\\\|]/g, "").replace(/\.\w{2,5}$/, "").trim() + (ext || ".png");
+    }
+
+    function canonicalUri(src, href, basePath) {
+        if (!src) {
+            return "";
+        }
+        if (!href) href = location.href;
+        let protocol = href.match(/^https?:/);
+        protocol = protocol ? protocol[0] : location.protocol;
+        let host = href.match(/^https?:\/\/([^\/]+)/);
+        host = host ? host[1] : location.host;
+        if (src.charAt(0) === "#") return href + src;
+        if (src.charAt(0) === "?") return href.replace(/^([^\?#]+).*/, "$1" + src);
+        let origin = protocol + '//' + host;
+        let url = basePath || href;
+        url = url.replace(/(\?|#).*/, "");
+        if (/https?:\/\/[^\/]+$/.test(url)) url = url + '/';
+        if (url.indexOf("http") !== 0) url = origin + url;
+        var root_page = /^[^\?#]*\//.exec(url)[0],
+            root_domain = /^\w+\:\/\/\/?[^\/]+/.exec(root_page)[0],
+            absolute_regex = /^\w+\:\/\//;
+        src = src.replace(/^\/(\.\.\/)+/, "/");
+        while (src.indexOf("../") === 0) {
+            src = src.substr(3);
+            root_page = root_page.replace(/\/[^\/]+\/$/, "/");
+        }
+        src = src.replace(/\.\//, "");
+        if (/^\/\/\/?/.test(src)) {
+            src = protocol + src;
+        }
+        return (absolute_regex.test(src) ? src : ((src.charAt(0) === "/" ? root_domain : root_page) + src));
+    }
+
+    var _GM_download = (typeof GM_download == 'undefined') ? (url, name) => {
+        url = canonicalUri(url);
+        urlToBlob(url, (blob, ext) => {
+            if(blob){
+                try {
+                    saveAs(blob, ext && /^\w{2,5}$/.test(ext) ? name.replace(/\.\w+$/, '') + '.' + ext : name);
+                } catch(e) {
+                    console.log(e);
+                }
+            }
+        });
+    } : (url, name) => {
+        url = canonicalUri(url);
+        let urlSplit = ["", ""];
+        if (url.split) {
+            urlSplit = url.split("/");
+        }
+        GM_download({
+            url: url,
+            name: name,
+            headers: [{
+                origin: urlSplit[0]+"//"+urlSplit[2],
+                referer: url,
+                accept: "*/*"
+            }],
+            onerror: e => {
+                console.log(e);
+            },
+            ontimeout: e => {
+                console.log(e);
+            }
+        })
+    };
+    function dataURLToCanvas(dataurl, cb){
+        if(!dataurl)return cb(null);
+        var ctx = canvas.getContext('2d');
+        var img = new Image();
+        img.setAttribute("crossOrigin","anonymous");
+        img.onload = function(){
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            cb(canvas);
+        };
+        img.onerror = function(){
+            cb(null);
+        };
+        img.src = dataurl;
+    }
+    function urlToBlobWithFetch(urlString, cb){
+        fetch(urlString).then(response => response.blob()).then(blob => {
+            let ext = extFromMimeAndUrl(blob.type, urlString);
+            if (blob.type && blob.type.indexOf("text/html") === 0 && (blob.size || 0) < 1000) return cb(null, '');
+            if (ext === "none") ext = "webp";
+            let conversion = formatDict.get(ext);
+            if (canvas && conversion) {
+                var self = this;
+                var a = new FileReader();
+                a.readAsDataURL(blob);
+                a.onload = function (e) {
+                    dataURLToCanvas(e.target.result, canvas => {
+                        canvas.toBlob(nblob => {
+                            if (!nblob) {
+                                cb(blob);
+                            } else {
+                                cb(nblob, conversion || "png");
+                            }
+                        }, "image/" + (conversion || "png"));
+                    });
+                };
+                a.onerror = function (e){
+                    cb(blob);
+                }
+            } else {
+                cb(blob, ext);
+            }
+        }).catch(error => {
+            cb(null);
+        });
+    }
+    function loadVideoJsLibrary() {
+        if (!window.videoJsStatus) {
+            window.videoJsStatus = 'none';
+        }
+
+        return new Promise((resolve, reject) => {
+            if (window.videoJsStatus === 'loaded') {
+                return resolve();
+            }
+
+            if (window.videoJsStatus === 'loading') {
+                const interval = setInterval(() => {
+                    if (window.videoJsStatus === 'loaded') {
+                        clearInterval(interval);
+                        resolve();
+                    } else if (window.videoJsStatus === 'failed') {
+                        clearInterval(interval);
+                        reject(new Error('Previous Video.js loading attempt failed.'));
+                    }
+                }, 100);
+                return;
+            }
+
+            window.videoJsStatus = 'loading';
+
+            const cssSources = [
+                "https://vjs.zencdn.net/8.23.3/video-js.min.css",
+                "https://unpkg.com/video.js/dist/video-js.min.css",
+                "https://cdn.jsdelivr.net/npm/video.js@8.23.3/dist/video-js.min.css"
+            ];
+            const jsSources = [
+                "https://vjs.zencdn.net/8.23.3/video.min.js",
+                "https://unpkg.com/video.js/dist/video.min.js",
+                "https://cdn.jsdelivr.net/npm/video.js@8.23.3/dist/video.min.js"
+            ];
+            const fetchWithFallback = (urls) => {
+                return new Promise((resolve, reject) => {
+                    let lastError = null;
+                    const urlsToTry = [...urls];
+
+                    const tryNext = () => {
+                        if (urlsToTry.length === 0) {
+                            reject(new Error(`Failed to load resource after trying all sources. Last error: ${lastError}`));
+                            return;
+                        }
+
+                        const url = urlsToTry.shift();
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('GET', url);
+                        xhr.onload = () => {
+                            if (xhr.status === 200) {
+                                resolve(xhr.responseText);
+                            } else {
+                                lastError = `Status ${xhr.status} from ${url}`;
+                                console.warn(`Failed to load ${url}, trying next source...`);
+                                tryNext();
+                            }
+                        };
+                        xhr.onerror = () => {
+                            lastError = `Network error from ${url}`;
+                            console.warn(`Failed to load ${url}, trying next source...`);
+                            tryNext();
+                        };
+                        xhr.send();
+                    };
+
+                    tryNext();
+                });
+            };
+            const pCSS = fetchWithFallback(cssSources).then(cssContent => {
+                const styleElement = document.createElement('style');
+                styleElement.textContent = cssContent;
+                styleElement.id = 'imagus-videojs-styles';
+                document.head.appendChild(styleElement);
+            });
+            const pJS = fetchWithFallback(jsSources).then(jsContent => {
+                Function(jsContent)();
+            });
+
+            Promise.all([pCSS, pJS]).then(() => {
+                window.videoJsStatus = 'loaded';
+                console.timeEnd('Load Video.js');
+                resolve();
+            }).catch(error => {
+                window.videoJsStatus = 'failed';
+                console.error('Failed to load Video.js from all available sources.', error);
+                reject(error);
+            });
+        });
+    }
+    async function initVideojs(media, imgSrc) {
+        await loadVideoJsLibrary();
+        const videoOptions = {
+            autoplay: true
+        };
+        media.className = "video-js vjs-default-skin vjs-fluid";
+        media.width = 1920;
+        media.height = 1080;
+        const player = videojs(media, videoOptions);
+        player.on('loadedmetadata', function() {
+            const vhs = player.tech({ IWillNotUseThisInPlugins: true }).vhs;
+            if (!vhs) {
+                console.warn('VHS engine not found.');
+                return;
+            }
+            const representations = vhs.representations();
+            if (!representations || representations.length === 0) {
+                return;
+            }
+            let highestBandwidth = 0;
+            let highestRepresentation = null;
+            for (let i = 0; i < representations.length; i++) {
+                const representation = representations[i];
+                if (representation.bandwidth > highestBandwidth) {
+                    highestBandwidth = representation.bandwidth;
+                    highestRepresentation = representation;
+                }
+            }
+            if (highestRepresentation) {
+                representations.forEach(representation => {
+                    representation.enabled(representation.id === highestRepresentation.id);
+                });
+            }
+            const originalWidth = highestRepresentation ? highestRepresentation.width : player.videoWidth();
+            const originalHeight = highestRepresentation ? highestRepresentation.height : player.videoHeight();
+            this.addClass('vjs-has-started');
+            media.naturalWidth = originalWidth;
+            media.naturalHeight = originalHeight;
+            media.onload();
+        });
+        player.src({
+            src: imgSrc,
+            fluid: true,
+            type: 'application/x-mpegURL'
+        });
+    }
+    function getCookie(cname) {
+        let name = cname + "=";
+        var ca = document.cookie.split(';');
+        for(let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1);
+            if (c.indexOf(name) == 0)
+                return c.substring(name.length,c.length);
+        }
+        return "";
+    }
+    var cookie;
+    function extFromMimeAndUrl(mimeType, url) {
+        let ext = '';
+        if (mimeType) {
+            const cleanMime = mimeType.split(';')[0].trim().toLowerCase();
+            if (cleanMime.indexOf('image/') === 0) {
+                ext = cleanMime.slice(6);
+            } else if (cleanMime.indexOf('text/html') === 0) {
+                ext = 'text/html';
+            }
+        }
+        if (!ext) {
+            const m = String(url || '').match(/\.([a-z0-9]+)(?:$|[?#])/i);
+            ext = m ? m[1].toLowerCase() : '';
+        }
+        if (ext.indexOf('/') !== -1) ext = '';
+        return ext;
+    }
+    function urlToBlob(url, cb, forcePng, tryTimes = 0) {
+        tryTimes++;
+        if (tryTimes > 3) {
+            return cb(null, '');
+        }
+        _GM_xmlhttpRequest({
+            method: 'GET',
+            url: url.trim(),
+            responseType:'blob',
+            timeout:20000,
+            headers: {
+                origin: location.origin,
+                referer: location.href,
+                accept: "*/*"
+            },
+            cookie: cookie,
+            onload: function(d) {
+                let blob = d.response;
+                if (!blob.type) return urlToBlob(url, cb, forcePng, tryTimes);
+                let ext = extFromMimeAndUrl(blob.type, url);
+                if (blob.type && blob.type.indexOf("text/html") === 0 && (blob.size || 0) < 100000) {
+                    urlToBlobWithFetch(url, cb);
+                    return;
+                }
+                if (ext === "none") ext = "webp";
+                let conversion = formatDict.get(ext);
+                if (canvas && (conversion || forcePng)) {
+                    var self = this;
+                    var a = new FileReader();
+                    a.readAsDataURL(blob);
+                    a.onload = function (e) {
+                        dataURLToCanvas(e.target.result, canvas => {
+                            canvas.toBlob(nblob => {
+                                if (!nblob) {
+                                    cb(blob, ext || "png");
+                                } else {
+                                    cb(nblob, conversion || "png");
+                                }
+                            }, "image/" + (conversion || "png"));
+                        });
+                    };
+                    a.onerror = function (e){
+                        urlToBlob(url, cb, forcePng, tryTimes);
+                    }
+                } else if (!blob || !blob.size) {
+                    urlToBlob(url, cb, forcePng, tryTimes);
+                } else {
+                    cb(blob, ext);
+                }
+            },
+            onerror: function(){
+                urlToBlob(url, cb, forcePng, tryTimes);
+            },
+            ontimeout: function(){
+                urlToBlob(url, cb, forcePng, tryTimes);
+            }
+        });
+    }
+    var prefs;
+
+    function parseTrustedTypes(cspString) {
+        const policies = new Set();
+        let allowDuplicates = false;
+        let ttDirectiveFound = false;
+        const ttRegex = /trusted-types\s+([^;]+)/gi;
+        let match;
+
+        while ((match = ttRegex.exec(cspString)) !== null) {
+            ttDirectiveFound = true;
+            match[1].trim().split(/\s+/)
+                .forEach(name => {
+                if (name === "'allow-duplicates'") {
+                    allowDuplicates = true;
+                } else if (name !== "'none'") {
+                    policies.add(name.replace(/'/g, ''));
+                }
+            });
+        }
+        return { names: policies, allowDuplicates: allowDuplicates, ttDirectiveFound: ttDirectiveFound };
+    }
+
+    async function getCspTrustedTypesInfo() {
+        const combinedPolicies = new Set();
+        let combinedAllowDuplicates = false;
+        let combinedTtDirectiveFound = false;
+
+        const meta = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+        if (meta) {
+            const metaResult = parseTrustedTypes(meta.content);
+            metaResult.names.forEach(name => combinedPolicies.add(name));
+            if (metaResult.allowDuplicates) {
+                combinedAllowDuplicates = true;
+            }
+            if (metaResult.ttDirectiveFound) {
+                combinedTtDirectiveFound = true;
+            }
+        }
+
+        return new Promise((resolve) => {
+            GM_xmlhttpRequest({
+                method: "HEAD",
+                url: window.location.href,
+                onload: function(response) {
+                    const cspHeader = response.responseHeaders.split('\r\n')
+                    .filter(h => h.toLowerCase().startsWith('content-security-policy:'))
+                    .map(h => h.substring(26).trim())
+                    .join('; ');
+
+                    const headerResult = parseTrustedTypes(cspHeader);
+                    headerResult.names.forEach(name => combinedPolicies.add(name));
+                    if (headerResult.allowDuplicates) {
+                        combinedAllowDuplicates = true;
+                    }
+                    if (headerResult.ttDirectiveFound) {
+                        combinedTtDirectiveFound = true;
+                    }
+
+                    resolve({
+                        names: combinedPolicies,
+                        allowDuplicates: combinedAllowDuplicates,
+                        ttDirectiveFound: combinedTtDirectiveFound
+                    });
+                },
+                onerror: function(error) {
+                    resolve({
+                        names: combinedPolicies,
+                        allowDuplicates: combinedAllowDuplicates,
+                        ttDirectiveFound: combinedTtDirectiveFound
+                    });
+                }
+            });
+        });
+    }
+
+    function isTrustedTypesEnforced() {
+        try {
+            document.createElement('div').innerHTML = '';
+            return false;
+        } catch (e) {
+            return true;
+        }
+    }
+
+    async function createPolicy() {
+        if (!(unsafeWindow.trustedTypes && unsafeWindow.trustedTypes.createPolicy && isTrustedTypesEnforced())) {
+            return;
+        }
+
+        const { names: allowedNames, allowDuplicates, ttDirectiveFound } = await getCspTrustedTypesInfo();
+
+        if (ttDirectiveFound && !allowDuplicates) {
+            debug("CSP Trusted Types is enforced without 'allow-duplicates'. " +
+                         "Skipping policy creation to avoid conflicts with the page.");
+            return;
+        }
+
+        const MY_POLICY_NAME = 'pvcep_default';
+
+        try {
+            escapeHTMLPolicy = unsafeWindow.trustedTypes.createPolicy(MY_POLICY_NAME, {
+                createHTML: (string, sink) => string,
+                createScriptURL: string => string,
+                createScript: string => string
+            });
+            escapeHTMLCreator = escapeHTMLPolicy.createHTML;
+            return;
+        } catch (e) {
+        }
+        debug("Could not create any trusted types policy.");
+    }
+
+    let escapeHTMLPolicy = null;
+    let escapeHTMLCreator = null;
+    let canDirectSetHTML = true;
+    let canPolicySetHTML = true;
+
+    function getBody(doc){
+        return doc.body || doc.querySelector('body') || doc;
+    }
+    function createHTML(html){
+        const fragment = document.createDocumentFragment();
+        if (html === null || html === undefined || html === '') return fragment;
+        parseHTMLToFragment(String(html), fragment, document);
+        return fragment;
+    }
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const VOID_TAGS = {
+        area: true,
+        base: true,
+        br: true,
+        col: true,
+        embed: true,
+        hr: true,
+        img: true,
+        input: true,
+        link: true,
+        meta: true,
+        param: true,
+        source: true,
+        track: true,
+        wbr: true
+    };
+    const RAW_TEXT_TAGS = {
+        script: true,
+        style: true,
+        textarea: true,
+        title: true,
+        xmp: true,
+        plaintext: true,
+        noscript: true
+    };
+    const HTML_ENTITIES = {
+        amp: '&',
+        lt: '<',
+        gt: '>',
+        quot: '"',
+        apos: "'",
+        nbsp: '\u00A0'
+    };
+    function decodeEntities(text){
+        return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function(_, code){
+            if (code[0] === '#') {
+                const isHex = code[1] === 'x' || code[1] === 'X';
+                const num = parseInt(code.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+                if (!isNaN(num)) {
+                    try { return String.fromCodePoint(num); } catch(e) {}
+                }
+                return '&' + code + ';';
+            }
+            const key = code.toLowerCase();
+            return (key in HTML_ENTITIES) ? HTML_ENTITIES[key] : '&' + code + ';';
+        });
+    }
+    function parseHTMLToFragment(html, fragment, doc){
+        const stack = [fragment];
+        const tokenRe = /<!--[\s\S]*?-->|<!doctype[^>]*>|<\/?[a-zA-Z][^>]*>|[^<]+/gi;
+        let match;
+        while ((match = tokenRe.exec(html))) {
+            const token = match[0];
+            if (token[0] !== '<') {
+                const text = decodeEntities(token);
+                if (text) stack[stack.length - 1].appendChild(doc.createTextNode(text));
+                continue;
+            }
+            if (token.indexOf('<!--') === 0) {
+                continue;
+            }
+            if (/^<!doctype/i.test(token)) {
+                continue;
+            }
+            if (token[1] === '/') {
+                const tag = token.slice(2, -1).trim().toLowerCase();
+                for (let i = stack.length - 1; i > 0; i--) {
+                    const node = stack[i];
+                    if (node.nodeType === 1 && node.nodeName.toLowerCase() === tag) {
+                        stack.length = i;
+                        break;
+                    }
+                }
+                continue;
+            }
+            const tagMatch = /^<\s*([^\s/>]+)/.exec(token);
+            if (!tagMatch) continue;
+            const rawName = tagMatch[1];
+            const tagName = rawName.toLowerCase();
+            const parent = stack[stack.length - 1];
+            const parentIsSvg = parent.nodeType === 1 && parent.namespaceURI === SVG_NS;
+            const isSvg = parentIsSvg || tagName === 'svg';
+            const el = isSvg ? doc.createElementNS(SVG_NS, rawName) : doc.createElement(tagName);
+            const attrPart = token.replace(/^<\s*[^\s/>]+/, '').replace(/\/?>$/, '');
+            if (attrPart) {
+                const attrRe = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+                let attrMatch;
+                while ((attrMatch = attrRe.exec(attrPart))) {
+                    const name = attrMatch[1];
+                    const value = decodeEntities(attrMatch[2] || attrMatch[3] || attrMatch[4] || '');
+                    el.setAttribute(name, value);
+                }
+            }
+            parent.appendChild(el);
+            const selfClosing = token.endsWith('/>');
+            if (!selfClosing && !VOID_TAGS[tagName]) {
+                stack.push(el);
+                if (RAW_TEXT_TAGS[tagName]) {
+                    const closeRe = new RegExp('<\\/\\s*' + tagName + '\\s*>', 'ig');
+                    closeRe.lastIndex = tokenRe.lastIndex;
+                    const closeMatch = closeRe.exec(html);
+                    if (closeMatch) {
+                        const rawText = html.slice(tokenRe.lastIndex, closeMatch.index);
+                        if (rawText) el.appendChild(doc.createTextNode(rawText));
+                        tokenRe.lastIndex = closeMatch.index + closeMatch[0].length;
+                        stack.pop();
+                    }
+                }
+            }
+        }
+    }
+    function createScriptURL(html){
+        return escapeHTMLPolicy?escapeHTMLPolicy.createScriptURL(html):html;
+    }
+    function createScript(html){
+        return escapeHTMLPolicy?escapeHTMLPolicy.createScript(html):html;
+    }
+    function tryDirectSetHTML(target, htmlStr){
+        if (!canDirectSetHTML) return false;
+        try {
+            target.innerHTML = htmlStr;
+            return true;
+        } catch (e) {
+            canDirectSetHTML = false;
+            return false;
+        }
+    }
+    function ensureEscapeHTMLCreator(){
+        if (!canPolicySetHTML) return null;
+        if (escapeHTMLCreator) return escapeHTMLCreator;
+        if (escapeHTMLPolicy && typeof escapeHTMLPolicy.createHTML === "function") {
+            escapeHTMLCreator = escapeHTMLPolicy.createHTML;
+            return escapeHTMLCreator;
+        }
+        return null;
+    }
+    function tryPolicySetHTML(target, htmlStr){
+        if (!canPolicySetHTML) return false;
+        const creator = ensureEscapeHTMLCreator();
+        if (!creator) return false;
+        try {
+            target.innerHTML = creator(htmlStr);
+            return true;
+        } catch (e) {
+            canPolicySetHTML = false;
+            return false;
+        }
+    }
+    function setHTML(target, html){
+        if (!target) return;
+        const htmlStr = html === null || html === undefined ? '' : String(html);
+        if (tryDirectSetHTML(target, htmlStr) || tryPolicySetHTML(target, htmlStr)) return;
+        const fragment = createHTML(htmlStr);
+        while (target.firstChild) {
+            target.removeChild(target.firstChild);
+        }
+        target.appendChild(fragment);
+    }
+    async function init(topObject,window,document,arrayFn,envir,storage,unsafeWindow){
+        await createPolicy();
         // 默认设置，请到设置界面修改
         prefs={
             floatBar:{//浮动工具栏相关设置.
-                butonOrder:['actual','current','gallery','magnifier','download'],//按钮排列顺序'actual'(实际的图片),'current'(当前显示的图片),'magnifier'(放大镜观察),'gallery'(图集),'search'(搜索原图)
+                butonOrder:['actual','current','gallery','magnifier','download','stitch'],//按钮排列顺序'actual'(实际的图片),'current'(当前显示的图片),'magnifier'(放大镜观察),'gallery'(图集),'search'(搜索原图)
+                additionalFeature: 'open',
+                invertAdditionalFeature: false,
                 listenBg:true,//监听背景图
                 showDelay:100,//浮动工具栏显示延时.单位(毫秒)
                 hideDelay:566,//浮动工具栏隐藏延时.单位(毫秒)
@@ -11713,6 +12953,7 @@ ImgOps | https://imgops.com/#b#`;
                 stayOut:false,
                 stayOutOffsetX:0,
                 stayOutOffsetY:0,
+                download2copy:false,//废弃
                 offset:{//浮动工具栏偏移.单位(像素)
                     x:-15,//x轴偏移(正值,向右偏移,负值向左)
                     y:-15,//y轴偏移(正值,向下,负值向上)
@@ -11720,18 +12961,19 @@ ImgOps | https://imgops.com/#b#`;
                 forceShow:{//在没有被缩放的图片上,但是大小超过下面设定的尺寸时,强制显示浮动框.
                     enabled:true,//启用强制显示.
                     size:{//图片尺寸.单位(像素);
-                        w:45,
-                        h:45,
+                        w:100,
+                        h:100,
                     },
                 },
+                showWithRules:true,
                 minSizeLimit:{//就算是图片被缩放了(看到的图片被设定了width或者height限定了大小,这种情况下),如果图片显示大小小于设定值,那么也不显示浮动工具栏.
-                    w:25,
-                    h:25,
+                    w:50,
+                    h:50,
                 },
                 sizeLimitOr:false,
 
                 keys: {
-                    enable: true,
+                    enable: false,
                     actual: 'a', //  当出现悬浮条时按下 `a` 打开原图
                     search: 's',
                     current: 'c',
@@ -11745,7 +12987,9 @@ ImgOps | https://imgops.com/#b#`;
                     alt: false,
                     shift: false,
                     command: false,
-                    type: "hold"
+                    type: "hold",
+                    closeAfterPreview: true,
+                    previewFollowMouse: true
                 }
             },
 
@@ -11754,6 +12998,11 @@ ImgOps | https://imgops.com/#b#`;
                 wheelZoom:{//滚轮缩放.
                     enabled:true,
                     pauseFirst:true,//需要暂停(单击暂停)后,才能缩放.(推荐,否则因为放大镜会跟着鼠标,如果放大镜过大,那么会影响滚动.)..
+                    scaleImage:true,
+                    ctrl: false,
+                    alt: false,
+                    shift: false,
+                    meta: false,
                     range:[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.7,1.9,2,2.5,3.0,4.0,5.0,6.0,7.0,8.0,9.0],//缩放的范围
                 },
             },
@@ -11768,35 +13017,40 @@ ImgOps | https://imgops.com/#b#`;
                 exportType:'grid',
                 sidebarPosition: 'bottom',//'top' 'right' 'bottom' 'left'  四个可能值
                 sidebarSize: 120,//侧栏的高（如果是水平放置）或者宽（如果是垂直放置）
+                backgroundColor: 'rgba(20,20,20,0.75)',
+                formatConversion: "webp>png",
+                aria2Host: "http://localhost:6800",
+                aria2Token: "",
                 sidebarToggle: true, // 是否显示隐藏按钮
                 transition:true,//大图片区的动画。
                 preload:true,//对附近的图片进行预读。
-                max:5,//最多预读多少张（前后各多少张）
+                max:3,//最多预读多少张（前后各多少张）
 
                 zoomresized: 25, // 图片尺寸最少相差比例，单位：%
                 scaleSmallSize: 250, // 图库的新类别，缩放的图片，尺寸的高或宽都小于该值
                 showSmallSize:true,//是否默认显示小尺寸图片
+                disableArrow:false,
 
-                scrollEndAndLoad: false, // 滚动主窗口到最底部，然后自动重载库的图片。还有bug，有待进一步测试
-                scrollEndAndLoad_num: 3, // 最后几张图片执行
+                scrollEndAndLoad: true, // 滚动主窗口到最底部，然后自动重载库的图片。
+                scrollEndAndLoad_num: 5, // 最后几张图片执行
 
-                autoZoom: true, // 如果有放大，则把图片及 sidebar 部分的缩放改回 100%，增大可视面积（仅在 chrome 下有效）
+                autoZoom: false, // 如果有放大，则把图片及 sidebar 部分的缩放改回 100%，增大可视面积（仅在 chrome 下有效）
                 descriptionLength: 32, // 注释的最大宽度
-                editSite: "Lunapic",
+                editSite: "",
                 defaultSizeLimit:{
-                    w:200,
-                    h:200
+                    w:80,
+                    h:80
                 },
                 searchData:defaultSearchData,
                 downloadWithZip:true,
                 autoOpenViewmore:false,
-                viewmoreLayout:0,
-                downloadGap:0
+                downloadGap:100
             },
 
             imgWindow:{// 图片窗相关设置
                 suitLongImg: true,
-                fitToScreen: false,//适应屏幕,并且水平垂直居中(适应方式为contain，非cover).
+                fitToScreen: true,//适应屏幕,并且水平垂直居中(适应方式为contain，非cover).
+                fitToScreenSmall: false,
                 syncSelectedTool:true,//同步当前选择的工具，如果开了多个图片窗口，其中修改一个会反映到其他的上面。
                 defaultTool:'hand',//"hand","rotate","zoom";打开窗口的时候默认选择的工具
                 close:{//关闭的方式
@@ -11808,13 +13062,15 @@ ImgOps | https://imgops.com/#b#`;
                     shown:false,//显示
                     color:'rgba(200,200,200,0.3)',//颜色和不透明度设置.
                 },
+                switchStoreLoc:false,
                 backgroundColor:'rgba(40,40,40,0.8)',
                 shiftRotateStep:15,// 旋转的时候，按住shift键时,旋转的步进.单位:度.
                 zoom:{//滚轮缩放
                     range:[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.7,1.9,2,2.5,3.0,4.0,5.0,6.0,7.0,8.0,9.0],//缩放比例.(不要出现负数,谢谢-_-!~)
                     mouseWheelZoom:true,//是否允许使用滚轮缩放。
                 },
-                zIndex: 2147483646
+                zIndex: 2147483646,
+                fixed: false
             },
 
             //等图片完全载入后,才开始执行弹出,放大等等操作,
@@ -11828,49 +13084,64 @@ ImgOps | https://imgops.com/#b#`;
             debug: false,
             customLang:'auto',
             customRules:`[
-//{
-//name: "Example",
-//url: /https?:\/\/www.google(\.\w{1,3}){1,3}\/search\?.*/,
-//getImage: function(a){
-//},
-//src: /avatar/i,
-//r: /\?.*$/i,
-//s: ''
-//}
+    {
+        "name": "Example, can be deleted safely",
+        "url": "^https://xxx\\\\.com",
+        "src": "/avatar/i",
+        "r": "/\\\\?.*$/i",
+        "s": ""
+    }
 ]`,
             firstEngine:"Tineye"
         };
 
-        var tprules=[
+        var matchedRule,
+            _URL=location.href.length > 510 ? location.href.slice(0, 500) + location.href.slice(-10) : location.href.slice(0, 500);
+        const lazyImgAttr = ["data-lazy-src", "org_src", "data-lazy", "data-url", "data-orig-file", "zoomfile", "file", "original", "load-src", "imgsrc", "real_src", "src2", "origin-src", "data-lazyload", "data-lazyload-src", "data-lazy-load-src", "data-ks-lazyload", "data-ks-lazyload-custom", "data-defer-src", "data-actualsrc", "data-original", "data-origin-src", "data-imageurl", "lazysrc", "data-src", "data-preview", "data-cover", "data-page-image-url", "data-thumb", "data-placeholder"];
+        var tprules = [
             function(a) {
-                var oldsrc = this.src,newsrc = this.src;
-                if(this.getAttribute("lazysrc")){
-                    newsrc=this.getAttribute("lazysrc");
-                }else if(this.getAttribute("_src") && !this.src){
-                    newsrc=this.getAttribute("_src");
-                }else if(this.dataset && this.dataset.original){
-                    newsrc=this.dataset.original;
-                }else if(this.dataset && this.dataset.src){
-                    newsrc=this.dataset.src;
-                }else if(this._lazyrias && this._lazyrias.srcset){
-                    newsrc=this._lazyrias.srcset[this._lazyrias.srcset.length-1];
-                }else if(this.dataset && this.dataset.origFile){
-                    newsrc=this.dataset.origFile;
-                }else if(this.srcset){
-                    var srcs=this.srcset.split(","),largeSize=0;
-                    srcs.forEach(srci=>{
-                        let srcInfo=srci.trim().split(" "),curSize=parseInt(srcInfo[1]);
-                        if(!srcInfo[1]){
-                            newsrc=srcInfo[0];
-                        }else if(curSize>largeSize){
-                            largeSize=curSize;
-                            newsrc=srcInfo[0];
+                if (this.currentSrc && !this.src) this.src = this.currentSrc;
+                var oldsrc = this.currentSrc || this.src;
+                var newsrc = null;
+
+                if (matchedRule.lazyAttr) {
+                    newsrc = this.getAttribute(matchedRule.lazyAttr);
+                } else if (this.getAttribute("_src") && !this.src) {
+                    newsrc = this.getAttribute("_src");
+                } else {
+                    for (let i in lazyImgAttr) {
+                        let attrName = lazyImgAttr[i];
+                        let attrValue = this.getAttribute(attrName);
+                        if (/\bimagecover\.\w+$/i.test(attrValue)) continue;
+                        if (attrValue) {
+                            newsrc = attrValue;
+                            break;
+                        }
+                    }
+                }
+                if (!newsrc && this._lazyrias && this._lazyrias.srcset) {
+                    newsrc = this._lazyrias.srcset[this._lazyrias.srcset.length - 1];
+                }
+                if (newsrc) {
+                } else if (this.srcset) {
+                    var srcs = this.srcset.split(/[xw],\s*/i), largeSize = -1;
+                    srcs.forEach(srci => {
+                        let srcInfo = srci.trim().split(/\s+/), curSize = parseInt(srcInfo[1] || 0);
+                        if ((srcInfo[1] || !oldsrc) && curSize > largeSize) {
+                            largeSize = curSize;
+                            newsrc = srcInfo[0];
                         }
                     });
                 }
-                return oldsrc != newsrc ? newsrc : null;
+
+                return oldsrc != canonicalUri(newsrc) ? newsrc : null;
             }
         ];
+
+        const imageReg = /^\s*(https?|ftp):\/\/.*?\/[^\.:：]*\.(avi|avif|avifs|bmp|gif|gifv|ico|jfif|jpe|jpeg|jpg|jif|jfi|a?png|svgz?|webp|xbm|dib|divx|3gpp|m3u|m4v|mkv|mp4|mpe?g|ogv|webm|flv|flac|m4a|m4b|mpa|mp3|aac|cda|oga|ogg|opus|wma|wav)(&|\?|#|\/?$|\s)/i;
+
+        const ruleImportHost = ["greasyfork.org", "github.com", "reddit.com"];
+        const ruleImportUrlReg = /greasyfork\.org\/.*scripts\/24204(\-[^\/]*)?(\/discussions|\/?$|\/feedback)|github\.com\/hoothin\/UserScripts\/(tree\/master\/Picviewer%20CE%2B|issues|discussions)|\.reddit\.com\/r\/PicviewerCE/i;
 
         //图标
         prefs.icons={
@@ -11880,6 +13151,10 @@ ImgOps | https://imgops.com/#b#`;
             gallery:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAP1BMVEUAAAD///94eHgZGRn39/fz8/POzs6xsbGSkpJ9fX1UVFQpKSnb29vJycmmpqafn5+UlJSNjY0/Pz8hISENDQ2fWpEMAAAAcUlEQVQoz43SWQrEIBRE0Xe7M8/T/tcaNSKCKUh95nCDiIaYYa9zUDQRiiaCalANqkE0n6BuBLArWBTUAsa2/3yqfwYdzAl+GeCWAN9YM7nvo4chgoXmgjP8CdoEvqmA/oCQRHgat2p7YM2gvHb9GMRu7acCGLmlyNoAAAAASUVORK5CYII=',
             search:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAXVBMVEUAAAD///+MjIwmJibNzc2UlJTd3d2lpaUKCgrT09O/v78YGBjj4+MvLy8PDw/IyMh5eXn5+fn29vby8vLo6OjDw8O7u7u3t7ewsLCcnJx1dXVubm4+Pj43NzdkZGStc/JSAAAA4ElEQVQoz52RWW7DMAxE9bR635fYcXr/Y5aW7TYIGqDI/EjUAzRDUvFGCvWn/gHMOnmfNeYFJLonqnPVM8hrIA3B7of5BXkK47bXWwbe/ACp3OWqwSYnaI73+zStSST6AKYjE/sbQCZkpi0j0HSlUl/gPdwleM8SgSfIRzd8laRkcl0oIihYIkiVqhnl6hgicPRGrMHW0Ej4gXCYt8xiPoIw6TtANL8CVtpanSu1xvARJHYnpxpIq6tzU8D8UKIywHCNZCcpUDuXteDL57HngVMhf1nUQ9uisG47y492/kbfyJQHZ5yu1AMAAAAASUVORK5CYII=',
             download:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAASFBMVEUAAAD///86Ojq8vLxXV1ciIiKcnJympqZjY2MxMTHc3NywsLBDQ0NPT08VFRV5eXn39/fw8PDZ2dnV1dXKysqUlJTl5eUNDQ1EnTQhAAAAtUlEQVQoz33QWRKDIBAE0Gl2AXFP7n/TDKIEk5j+wKp+ZQ0D4SYE+pkDkrMe3rr0ATEYpUkrE+IFouyppJexgRR6IQQAPodlAqeAMyRoByIyjo8DrGpA2Td43YD2FfJHokR2hOsf8uy1v87oZOnrjHorFu7rreoexKLzhiFlqJsPxJL7dcZagWU532oG0ABNzj7y6wpwVAOgJ8AztgyhhTRyM0TsUQ0MuRi3AqaBayp85T/c5AVMKwUv6mnXTQAAAABJRU5ErkJggg==',
+            stitch:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYAgMAAACdGdVrAAAACVBMVEUAAAD///9XV1cawLSAAAAAKUlEQVQI12MIBQMGBwYgYMRBqQawRgAp0QDWEOwUHu349EGNxqsd6kAArN4RJ/MiMK0AAAAASUVORK5CYII=',
+            downloadSvgBtn:'<svg class="pv-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><title>Download</title><path d="M768 768q0-14.857143-10.857143-25.714286t-25.714286-10.857143-25.714285 10.857143-10.857143 25.714286 10.857143 25.714286 25.714285 10.857143 25.714286-10.857143 10.857143-25.714286z m146.285714 0q0-14.857143-10.857143-25.714286t-25.714285-10.857143-25.714286 10.857143-10.857143 25.714286 10.857143 25.714286 25.714286 10.857143 25.714285-10.857143 10.857143-25.714286z m73.142857-128v182.857143q0 22.857143-16 38.857143t-38.857142 16H91.428571q-22.857143 0-38.857142-16t-16-38.857143v-182.857143q0-22.857143 16-38.857143t38.857142-16h265.714286l77.142857 77.714286q33.142857 32 77.714286 32t77.714286-32l77.714285-77.714286h265.142858q22.857143 0 38.857142 16t16 38.857143z m-185.714285-325.142857q9.714286 23.428571-8 40l-256 256q-10.285714 10.857143-25.714286 10.857143t-25.714286-10.857143L230.285714 354.857143q-17.714286-16.571429-8-40 9.714286-22.285714 33.714286-22.285714h146.285714V36.571429q0-14.857143 10.857143-25.714286t25.714286-10.857143h146.285714q14.857143 0 25.714286 10.857143t10.857143 25.714286v256h146.285714q24 0 33.714286 22.285714z"></path></svg>',
+            video:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiIHZlcnNpb249IjEuMSI+PHBhdGggZD0iTTUxMiA2NEMyNjUuNiA2NCA2NCAyNjUuNiA2NCA1MTJzMjAxLjYgNDQ4IDQ0OCA0NDggNDQ4LTIwMS42IDQ0OC00NDhTNzU4LjQgNjQgNTEyIDY0ek02OTEuMiA1NDRsLTI1NiAxNTYuOEM0MjguOCA3MDQgNDIyLjQgNzA0IDQxNiA3MDRjLTYuNCAwLTkuNiAwLTE2LTMuMkMzOTAuNCA2OTQuNCAzODQgNjg0LjggMzg0IDY3MkwzODQgMzUyYzAtMTIuOCA2LjQtMjIuNCAxNi0yOC44IDkuNi02LjQgMjIuNC02LjQgMzIgMGwyNTYgMTY2LjRjOS42IDYuNCAxNiAxNiAxNiAyOC44QzcwNCA1MjggNzAwLjggNTQwLjggNjkxLjIgNTQ0eiIgZmlsbD0id2hpdGUiLz48L3N2Zz4=',
+            audio:'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAyNCAxMDI0IiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTc2OCA5MzguNjY2NjY3SDI1NmE4NS4zMzMzMzMgODUuMzMzMzMzIDAgMCAxLTg1LjMzMzMzMy04NS4zMzMzMzRWMTcwLjY2NjY2N2E4NS4zMzMzMzMgODUuMzMzMzMzIDAgMCAxIDg1LjMzMzMzMy04NS4zMzMzMzRoNDIuNjY2NjY3djI5OC42NjY2NjdsMTA2LjY2NjY2Ni02NEw1MTIgMzg0Vjg1LjMzMzMzM2gyNTZhODUuMzMzMzMzIDg1LjMzMzMzMyAwIDAgMSA4NS4zMzMzMzMgODUuMzMzMzM0djY4Mi42NjY2NjZhODUuMzMzMzMzIDg1LjMzMzMzMyAwIDAgMS04NS4zMzMzMzMgODUuMzMzMzM0bS0yMTMuMzMzMzMzLTI5OC42NjY2NjdhODUuMzMzMzMzIDg1LjMzMzMzMyAwIDAgMC04NS4zMzMzMzQgODUuMzMzMzMzIDg1LjMzMzMzMyA4NS4zMzMzMzMgMCAwIDAgODUuMzMzMzM0IDg1LjMzMzMzNCA4NS4zMzMzMzMgODUuMzMzMzMzIDAgMCAwIDg1LjMzMzMzMy04NS4zMzMzMzR2LTIxMy4zMzMzMzNoMTI4di04NS4zMzMzMzNoLTE3MC42NjY2Njd2MjI0Ljg1MzMzM2MtMTIuMzczMzMzLTcuMjUzMzMzLTI3LjMwNjY2Ny0xMS41Mi00Mi42NjY2NjYtMTEuNTJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==',
 
             retry:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MzIyMjhBQTUzNjdDMTFFMkI3QThBNTAwQUMxRDJGREMiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6MzIyMjhBQTYzNjdDMTFFMkI3QThBNTAwQUMxRDJGREMiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDozMjIyOEFBMzM2N0MxMUUyQjdBOEE1MDBBQzFEMkZEQyIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDozMjIyOEFBNDM2N0MxMUUyQjdBOEE1MDBBQzFEMkZEQyIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pj9mTMsAAALCSURBVHjadFJLSFRhFD73v4+5d+4dmgkkEcxFOOo4OQ90FgVJ2lhihFk5ozWKGxeBBEWFmA/GzFVFu1xFRrVrHbiJaGVqCDUZEdKAi1mkQjWv++r817kXW/hfzv1f53zfOf93mNraWjhoMIQBQsiiaZjXDcP4s/8um81aMzHh4I/neJBlOSUr8meWY9tpgH1nD2KtbcPBEjYmCMIbSZR+u91u0+PxAFqdoijveIF/yDCMsC8eONM07XQFZJyS3NK4y+UiCAIcxwHP83vALEv3N/N/813FYjGBRxkHAOsEURSfSpI0IrtlQCYrANkcJgpI96FwqO5K/2WPk4H147gOTHlEkRXgeA7CkTAkBxLgb/BD34VLQFisFImSA0lIDibeY8iGA0BRa2pqZstq2XJsamqEqZnJt3g3fepE+7LiUUzfYR/cun0LotHIdFskli6Xy7C1tVUBQKlUXW2lZaiqCr19vatt0Vh3qVSy0g4EAzCTntmtrj7SH2mJLmmqBva72RmwxUJRwPotAJ/Pd6dULIGu66ARDR4/efQJ73pbmkNZerZfAUvGtfVVQIkAGwU0TYMHc/M56khZKCAGnww2Hs/qmi4h2ShmOopzwgEIBcN6vb9epcEUZHNzc9ZqFQQwdAOa6gMFeo4NdVd0iQuiJC6g/5gDQNnOdZ9dozN90EK+cBFVWQAGDlVqFVDSCWS+hz1C5YaxG2P5/wDiXfHJM/FOR2+UdBSbaRfXPwWXUELW+9gbLO2NnvM90NF5Ou08Ik2zuSG4tLq+slhVVTX06uVrwCDA3qdlHKVZ0UBqV68NQmo49Qz9P+Ryub0O9vq8QBgC335sCLifynzJjC8+f0FWPq4A1Ztm1NrWCkPDKSPQHJhHn7T/WEN5+9d2BcDr3VtUmL5+z8RwO4EWR5PQCmhLaHP4oMu2Qjs7O1bcPwEGAErKEckpB5KiAAAAAElFTkSuQmCC',
             loading:'data:image/gif;base64,R0lGODlhGAAYALMPACgoKOnp6cnJyaamppmZmVhYWGdnZ3d3d4aGhgEBAdnZ2UNDQ/b29r29vbGxsf///yH/C05FVFNDQVBFMi4wAwEAAAAh/wtYTVAgRGF0YVhNUDw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6QUU5MTZGNDMxQ0E4MTFFMkE1Q0NEMTFGODU0MkUzNzUiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6QUU5MTZGNDQxQ0E4MTFFMkE1Q0NEMTFGODU0MkUzNzUiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpBRTkxNkY0MTFDQTgxMUUyQTVDQ0QxMUY4NTQyRTM3NSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpBRTkxNkY0MjFDQTgxMUUyQTVDQ0QxMUY4NTQyRTM3NSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PgH//v38+/r5+Pf29fTz8vHw7+7t7Ovq6ejn5uXk4+Lh4N/e3dzb2tnY19bV1NPS0dDPzs3My8rJyMfGxcTDwsHAv769vLu6ubi3trW0s7KxsK+urayrqqmop6alpKOioaCfnp2cm5qZmJeWlZSTkpGQj46NjIuKiYiHhoWEg4KBgH9+fXx7enl4d3Z1dHNycXBvbm1sa2ppaGdmZWRjYmFgX15dXFtaWVhXVlVUU1JRUE9OTUxLSklIR0ZFRENCQUA/Pj08Ozo5ODc2NTQzMjEwLy4tLCsqKSgnJiUkIyIhIB8eHRwbGhkYFxYVFBMSERAPDg0MCwoJCAcGBQQDAgEAACH5BAUFAA8ALAAAAAAYABgAAATMMMlJq710GQQAMgBmLYMSKMuirMQiSocZnOlqH68h06qtFJhPomASEDoEwQpYMFQWM2fhEJoADkyBwDVxMBgBp6igVBAm0C8D8YqtBFWDWlHFABo2MQLMGLwkCFoCbAkAKQt1IoaLEh2Of4WOVQUDBANiL4ENAjgJJAOViRYADoJAhZagpxgGgg11BqAtLwWbgxQABLMaiQAGLrUNXGguJA4EVB4DDQ7AmE8DDtIDHQ4N18200dIO1dfMq3YI0dSkDQMckI1NHb+i6vARACH5BAUFAA8ALAAAAAABAAEAAAQC8EUAIfkEBQUADwAsAQABABYAFgAABJbwySkPoYtq6gILEzhsmsd8YQCS4YlK6roVmeEpY0gdE0AQNQRLolBMDoMBcEiUjHzJQYFJUSwW0QtVQCkoBwbqg1A0PgBo8SSj3mRqjjhPLVAI444cs1EOD/BhQwdlXA8HcXpDdQpaD0lMcw8ChRJTEg4NiQ4CDZYsmA0NDhINk5yeG6ANE6WTq0MZmKMPpa9tcweoFBEAIfkEBQUADwAsAAAAAAEAAQAABALwRQAh+QQFBQAPACwBAAEAFQAVAAAEgvDJ+cAykhzKJzjEQABPwARONxXhIJImc6rP0r6lfGKqLfIDxe7Bk7gki0IHgSlKHI4BjRMIGKGpqaRqfWC1FK4BuwGbz+gOqfFgmwkKhaRBPws4dPdZ3m5ktXwUWUoqhHEdBQ0CDggZDYGFigICbgJxCncqBpKUEpZxAk4dipWYHREAIfkEBQUADwAsAAAAAAEAAQAABALwRQAh+QQFBQAPACwBAAEAFgAWAAAEn/DJKcs0C9A9FxrO8ADEQBzcBjrhWA6mlT5rS8Lmwhky+KAPQ4mgeyA6LFmqUAwEZIhGw6FMGQIMBkXaMMwkiKz2UeCKvhKFGNUAoyUDBpbwrkuK9oXuIGgIjnYTBQKEDnZOARJ+hEAzCIgPOgiEDVUzTmcPUjKNE4AzMgIKbRMCDwoSBp2lCq2mC6hpaKKukbF2BKICerFEdQsGgJ8cEQAh+QQFBQAPACwAAAAAAQABAAAEAvBFACH5BAUFAA8ALAEAAQAWABYAAASU8Mk5zyw0a9ecHM6AABrFNd3nrEMpFWf6gKz7eq10gPmCTaiJwbYgEEgSgaBhkxQHA8ujoRQ0HwUolFT1XAnagoV6lRgG4GE5A2hTkGuKQvEglAeMAMM+VzCvCgyCUn1lgnkTc1ZNBnoMXg9KV0ONARRqDwoBAnYSmg+YJXQBAXQSpJahGZ+lE6imTXQKSK1rcGYuEQAh+QQFBQAPACwAAAAAAQABAAAEAvBFACH5BAUFAA8ALAEAAQAWABYAAASV8MlJ5amYkiaadI3zLJlkcEL3NaxYPqj6gO0rcQ5ChUWWSj2MYTIYkB4EhUJgkwwcOYlAqbjYoK4H1dOcQaVMQvfgeEpIx25lwVY/APCHTqs2DAiD4YTZxBdJfHI2BUV3AEgSCk0LflYkihJzGYwEhxV6FAMPDAFnQRRDnWcPAQymohlWoiSlpg9WJZqdrAwPml1pTREAIfkEBQUADwAsAAAAAAEAAQAABALwRQAh+QQFBQAPACwBAAEAFgAWAAAEi/DJKQ2iOFOhhGxCo2Gc0n1C2hjjU54PqBbZMXGihDjhxE6mloT2cDgAGIVQ4mjkHsplxdlwPH5SyYAqMUWzVpsEmS2bywfHwGoIuL9Co4OmcAek8sHEnV1bgVeBGQULWnoUPwEMCocGBAMEhS2KDAx3AI8DkJIalJYPmJqbcYqXjwQGZEsHBEOcGBEAIfkEBQUADwAsAAAAAAEAAQAABALwRQAh+QQFBQAPACwBAAEAFgAWAAAEk/DJSSUyNc+hnlqPoAiENh2dlIrKaKrTF7auhnlhKTV1YUuHTPBRaDRAj0Eg8JoUBQLKktkMQRuSabTqgEYR1KpF0NhKkOK0mhFgDNSOR5BBTw+MWAmdUTXgN3QBNy8ORghSZz4Vgw5xJ2cEAwQ3BwMOby8LkQOSAEmNly8Fm5yelo0DihoAB5EEppdDVQALN4MZEQAh+QQFBQAPACwAAAAAAQABAAAEAvBFADs=',
@@ -11890,9 +13165,10 @@ ImgOps | https://imgops.com/#b#`;
             zoom:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MzI2NDFENzExQ0NBMTFFMjhDOUNGQ0NDOTYzODI4REUiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6MzI2NDFENzIxQ0NBMTFFMjhDOUNGQ0NDOTYzODI4REUiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDozMjY0MUQ2RjFDQ0ExMUUyOEM5Q0ZDQ0M5NjM4MjhERSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDozMjY0MUQ3MDFDQ0ExMUUyOEM5Q0ZDQ0M5NjM4MjhERSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PjUXtsUAAAHTSURBVHjazJTHakJREIZzc63YS2xYsKx05cYXEHwBfQb3PpgbwRdw60oXtoWoWBAL9i7mQyGERMNNWeRfXA4znO/M/GfuEZLJ5NNf6Pnpj/T/QLK70cPhMBgMlsslC4VCodPpnE4ni++BVqsViFQqFQgEjEbjbDZrNpu5XA6cVqt9BBLD4fCHWuRyeSaT4fxOp1Ov17fbrdvtTiQSpVLpdDqJoijJo/1+n06nQTQajcvlQkXn87larbZaLeJkpZodj8fppd/v04UgCFD46vX6Xq83nU7JSgX5/X4oarWawyFOJpP5fL7b7TQaDXGyUs2mF7ygKTafryKITSqVitKi0ajUiqjCZDJh6of48XgkTlYqaDQacUcc/nyVeNVt7fV6y+UylUoCFYtFs9nMBMES3ykYDNpsNpfL1e1277LuzNFwOIzFYlarFYPokUUkEgmFQuv1+uWqQqHAncpksq9AaLFYMERs8Hg8ZNnD3dGawWDgGIfDYbfbP7ME6e8RPw30zWbDGrOy2azP53sb9DsVPVKlUuEe+OPwiH6xkgjz9W0QqtVqsGjqxrrN6g/fI56B8XhssVgY3bdyHr5HXyufz+OOUqnkB/wVCLXb7X//Zr8KMADSBu6sAZizOwAAAABJRU5ErkJggg==',
             flipVertical:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6Mzc5RkM3NzYxQ0Y0MTFFMkFGQzk4NzFDMzc4MTVBMTIiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6Mzc5RkM3NzcxQ0Y0MTFFMkFGQzk4NzFDMzc4MTVBMTIiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDozNzlGQzc3NDFDRjQxMUUyQUZDOTg3MUMzNzgxNUExMiIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDozNzlGQzc3NTFDRjQxMUUyQUZDOTg3MUMzNzgxNUExMiIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PoWGg/MAAAFCSURBVHja3JTNboMwDMftaVyKVlrYCU68Ae/Ci/MQE1JRCuok1gNCnuMExgQEJnGaUaIA8S9/fwDmeQ5H2AscZIeBXqc3Xde1bcvzppvneb7v87wMSpIkjuOdEsqyrKpqGcSUoigQkPQgQuQZkN8gkKz0JUuALMtWQWxBEOyRQ+4csYXXUCTovYR6IGo3lHsYFRJtgKL3SPbooSMD8TPBoDxGOYeo73snKArFGa2z4AxJpOEo7XarXKArhzac7TKEDdDb+Qw/9TGx2AFDesAG7MyRfzqtVAn/0NlsX88n6BzIhNNiGyGms+ZFm4E+H495OrYStgSq68Y0r9QKx8sCLdH0lhN0r5XeRxYCQ3bpl7gFkTOQuoNtOrQlI3HTeZl8bQCX4OICNU2z8+t3gZRSaZruBPHmVdCH2H/5Zx8G+hZgAJcamqB3G0N7AAAAAElFTkSuQmCC',
             flipHorizontal:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NUVBRDRDOTkxQ0Y0MTFFMkI0OUU5NThEQzI4NTFGNDMiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6NUVBRDRDOUExQ0Y0MTFFMkI0OUU5NThEQzI4NTFGNDMiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo1RUFENEM5NzFDRjQxMUUyQjQ5RTk1OERDMjg1MUY0MyIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo1RUFENEM5ODFDRjQxMUUyQjQ5RTk1OERDMjg1MUY0MyIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pnl92swAAAFKSURBVHja3JTJjoMwDIbxqBw6SKVAT3DiDXgX3l9cRkhFLKIjekHIk9gJoXQhB07jILPFX37bAcjz3NnDvpydbDfQYXkzjuMwDMJvhrmu63me8K9BSZLEcWwpoSzLqqpegwSlKIogCKJLFIWXMAxOvv99PA73++/t1nVt07RN3bRd2/d9lmVL0LsagRhkSA75Sp7h4fUnEIhZKkhPpzhyqPBg1TVAMcBEMJnRjAJECxBKkloUlo+FWLkG8S1SU8sDPjDmM2u0UwScnJFDUCEHqIIrpR9qhHIAeZ2Tfj4rsUptlZW6RWSk2RAbIFw2Ho2nxFSN0E4RzUe9qUxiYPTZ1Agck5rqDhdbooC1gGNZbN7JWpFOEFbpb9VIBZnNrLCyj6KZT4znr7+u6zRNxcU0Tdequi4+7tn881kcPPkt6Ifsv/yzdwP9CTAAzDedWzss4SgAAAAASUVORK5CYII=',
+            compare:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAYFBMVEVTU1O6urqrq6tmZmawsLCzs7NxcXFwcHCvr6+oqKiamppcXFxXV1dVVVVzc3Otra1qamp4eHhfX1+1tbWlpaWioqKdnZ2VlZWQkJCKioqEhIRtbW1iYmJZWVl+fn55eXlv0MifAAAAo0lEQVQoz7XQyQ6CMBCA4Q7dgUJb9k3f/y0dhBSxejCG/9KkX+YwQ/5p0Fn0l1GsAW8o5knIaY6Byilgagyg4VmZzxoDFiDZQGVGFFImn0CKaYd4QvwERH6BpRAiglrz3HYymmD3tjIWeivfYKQNx82rmz0BH6htKgRInH6FtnCu5itArcoAJTB2HBEOaPcjmg10gLlPMcYXv77dRM6l4MklPQAAZAfZanJzfwAAAABJRU5ErkJggg==',
             close:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC4AAAARCAIAAAAt9wkYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6Q0I3NzA1RDAxQ0Y3MTFFMkJGMTU4MTc4OEQ2N0MzQjkiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6Q0I3NzA1RDExQ0Y3MTFFMkJGMTU4MTc4OEQ2N0MzQjkiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpDQjc3MDVDRTFDRjcxMUUyQkYxNTgxNzg4RDY3QzNCOSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpDQjc3MDVDRjFDRjcxMUUyQkYxNTgxNzg4RDY3QzNCOSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PmUW1owAAADqSURBVHja5FWxCoQwDL2W+x4X/QmHujvXzV0XadHN31HUn2gR/KD2AgWRAytETpTLEF5eSfqaaEvyPH/dw97W2rtIMcY8uytKKQeiKPKTP5fSdZ0DSZKEYQhAa72SdV0japIsy3D9XPdjjIHv+96FUkpPFqV0VwrnHD3dpmm+GCHEwdEJ2VVpTlhVVdtaEB6m2H2j9oTN87yVAuFhikclviuw8TAMWykQAonuCvJeWZZlmiaHy7IE37Yt+HEc4zgOggBREzmgVUdRFI4B4BhYwg2IpGl65ZXq+ZmvfoM838MfP4fPGNBHgAEAi7gyuvHuhZcAAAAASUVORK5CYII=',
             searchBtn:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC4AAAARBAMAAABQu4N8AAAAGFBMVEVnZ2dYWFhfX19qampUVFTl5eVjY2NbW1ua0D9wAAAAaUlEQVQY03WKwQ2AIBAE/ViADxsgsQJbsAA0GagAOyC27z0O1wfMJZvs7E17n6EXM1Hlr+kORJtUb6dgQWpVPhVSkQ8OYeOydOT9nOH/49RcyTW3Ko8F8kuDc1n5mvwKNslrMC1/9Bn5FxqpUThYQLEuAAAAAElFTkSuQmCC',
-            rotateIndicatorBG:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALoAAAC5CAYAAACfmiVfAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDowNDQzRDlCNjE4MjRFMjExQTlDNjhCQTlBOTYyNUVGMyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDpGRDEzOEEzQTI0MjAxMUUyOTRGREE2NjkyQjdBREQ5OCIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDpGRDEzOEEzOTI0MjAxMUUyOTRGREE2NjkyQjdBREQ5OCIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M2IChXaW5kb3dzKSI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOjMwOTI1OTNBMUUyNEUyMTFBOUM2OEJBOUE5NjI1RUYzIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjA0NDNEOUI2MTgyNEUyMTFBOUM2OEJBOUE5NjI1RUYzIi8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+Q3ni7gAAGahJREFUeNrsXQtYVOW6XjMDAwgICqgwXAxJaKuZl9BM81H3U9pRi+5aZFm5O6fc5Tm6PWUXd1m7jpW1s55qG2rb7badmnY5aRePl8obiaKiKIxyFwQRGBhghuF8H/OvWozDMPdZl+99nu+BNczAYq13fev93v/7/xW0atUqjuAXREKoIBoXLVoUhC/AsTfTYfEMcCydep+aDpXfkACRzL4PhehDh8R/IKL7l+hJ7PsQRnaCnxBEh8Bv0AmyeBglGSK6nDN6pEC60LEnosuW6NEC6RJMh4SILleixwoyeggdEipG5arR+7Loki68zUggossFMXwGNxgMqfBFw14ni5GILrts3gWTyZQqeJ0sRiK67PS5tSgKCkoRvB5Gh4aILkuiq9XqJCI6EV320gUyegJJFyK67DN6cHBwvOB1KkaJ6PLM6CBdwpOSkniCk8VIRJcN0EocKHwhPT09lrI6EV1uGMj95pt3IT4+Po50OhFdtvqcR79+/YQZnZwXIrq89DmPyMhIIjoRXf4ZPSwsjKQLEV3+GT00NJSKUSK6/DO6RqPpQxYjEV1uiLf3IlmMRHQ5AVtz4+yynyxGIrqcZQsPshiJ6LKXLQiyGInockJiTz8gi5GIroiMThYjEV1O0PX0A7IYieiKIDqCLEYiuuylS9cPyWIkossAuPxcX0dvIIuRiC4HJPR6JZDFSERXAtFtLEYiOhFdkkjs7Q02FiMRnYguv0IUQRYjEV0R0gVBFiMRXerQOZX2yWIkoisho5PFSESXMpC8Ti30TxYjEV322byL2WQxEtGVQHSyGInoiiA6WYxEdClD58qbyWIkoss+oyPIYiSi94QpHOsMhFt9jAhv9y5ldAlYjFEQN7HjHQzRn4juH+RBvA8xAaIR4loRHfwrlonuDSK3GJHgf8VjjkkFvg5nx5yI7gdchvgbxDurVq1aPHLkyGo8AXAiroYI9P90xTLRvUGkFmMExHKIN1pbW1fDccXend9B6OGYm4no/sMeiK8h7nzooYfeu/fee3GiA56MMXBS+kpFn3eJcvFZjOMgPoWY2dLSsumZZ55RwfeDIMqA5A2k0f2PtyBqIBLHjx//4uLFi6eHh4djJhoJZL8qQNld5+oHRGQx4j48C7Ea70xtbW36FStWHGEFchNEKRWjgQFqxZchOvF/0el0Ny9btmzRpEmTMKviYw6vA9KEiz2jIzIyMuJsCOdvjIbYBHEHhMpisbRt3rz5U6PRaIFtlCqnIZtbiOiBw36IzwV6NyErK2vRE088MVWr1aKcGQVkT4JQiTWjIwYNGiSUL/60GLEn5z8hPhBepCdOnNiWm5t7kW2iLjdKmSRy8dHfhqjkN1QqVVBaWtrM559//slRo0ZhpryKOTP+0L9uZfQAWYwjIP4BMVfIhfr6+vy1a9ceZJu1QPILUieIXIjeAvFnJmF+sw0iIq564IEHljzyyCPj1Wo1esGjmXvgS7j1+/1sMWohFkJ8DDFY+AOTydSwbt26f7HNNoizciCInEZGf2Eas/s/qFZrhw8ffs8LL7ywYOjQodHwElqQaEVqfSQD4tz5oB8txnSIv0PMs3P+O/ft27extLS0hW0XQjY3EdHFh9U9OQNRUVEZCxYsWDp37tzrYBMHl8YC2eO8/PcT3P2gHyxG9PYfg1gPMcTeG8rLy/d8+eWXfAYvB5Jflgsx5EZ0vNUuh7DrDqCNd/311z+4bNmy7KSkJPTarwGyZ3jRznOb6D62GIcwgv8Bf7e9NxiNxooPP/zwf9mmAeK8nIghx6aufHZr7hGxsbGjFi5c+KesrKwM2BzAWQeZvNFCoPPkwz6wGNVMouDxyOjpTRaLxQSZfIPBYEAbsYOTuJWoFKIjPoQodvSG4ODgvjfddNNjS5cuvSsmJgZtSG+0EHhU6HrZYkyGWMOKTof1SGFh4Zf79++vZpvngOQtciOEXIneDvEiZx3ocAQVkGvCEsAtt9wymPO8hcCjjO4lixHP6X0QGyGu7e3Nly9fLlizZs2PbLMOSF4pR0LIuR/9NESOU1ZJSEgMEP1JIPhMD1sIPCK6FyxGrBFw4GexM3cEs9nctGHDhk0gXfjkcFauZJD7xIscRvheoVKp1MnJyVNZCwES1p0WAo+kiwcWI4764tA92qujnfxM58GDBz8tLi42sO0zkM3biejShJlJmHYXyIYtBE+72EKABe1KrpdlonuDmxYj/u13OGszltMFbFVV1c+bN28uYJuVQPJLciaCCv5BTgGYx4oyl2AwGM5t3bp1Y15eXh1sNrCsZ9vzcSfEHyG80jzW1tZWU1tbewoKxJM7d+480d7eXgsvIwkb4G932rx9JsR/cda12J1Ga2tr9euvv/4m6HNMBM0QeVJ1WSABEdFt7lw43D3C1Q+Cfm0vKCjYvnbt2v3wPVpv2OBUxVlHQZdB3OqrnTaZTI2QeXP37dt3MDc3t5yztiRfgL+P2f45jk1vcwWdnZ0d27Zte3vv3r0VnHW8AUneLNUT6yzRNdOnT1cC0TET4vS727keBkwcaHfNgAEDho0fPz6lsrKyqK6uLgKy7cDMzMyX4Gc3+nKnNRpNSFRU1FUjRoyYOG7cuCSQNp3wdyfEx8cvh7891J3fefbs2a+2bNlynG2ilVgn5RMLdz0iug1QeqDsmOCufh49evS4uLi4S5MnT/638PDwa/2140BqFdQOA9PS0sbpdLrrYDPEnd/T2Nh45s0339wMWR03LwPJJe+yOEt0pS2Wg67EFBecCdsM22fs2LEP9iINLM3NzSWQ+YtAa1fV19efBy1cZjQa648cOVI7Z86c4NTUVG1sbGwUSJPBQNqrIUaq1erh8FXrq3+8o6Oj5Z8AZiWanXWj5AKlER1T2XJGeK/N4gFyd0K2PFtcXHwYMszxmpoaHGXEwAGYDv592dnZwo9VBwcHn4Gv3/I3DXYRouYfx3nZEQON/6/Tp0/z8z1lbSUS0a3AkT+cqPGsFwhugax9ZNeuXT8cOHDgAisWy9wcQm+F+IZFCsTDEDM4F1cUsIfq6uqDmzZtymebWMzWKu2kK3Wdv89Z9rzB3V9gMBj0O3bs2PzTTz9dYPq/yIvuRQm783wCsRRijLu/qK2trXbNmjX8VEOsUYqVeMKVSnSUMDipGpd0cMmDhixuKigo+CInJ+cni1Xw6n3YH6KHeBwii7MO62td3FfL999/vwHuOihTcF8LhVKKiK4MoMx4k2VOp9De3n7p66+/Xss8aJQaJ/3gQeNFuRUCLcE3OBf6afR6/Q4gOj8RpRT2tVGpJ1vpi4x+xVkXQuoVRqOx8uOPP36HkRz7Q476eaAFrcD5WEg6K60++uijH9gmSqsyJZ9oWk2X415lROgRLS0tFasBZ86caWIkzw+Qa4GDOwuwHnD0po6OjtbPPvvsH3AHwruBmUmWTiK6soHkec1BMVcHxdyHlZWVrayYOx7gtQfxQnvCUYY+evTo5vz8/Hq2iUVyq9JPMhGd8bmHYs68Y8eO9efOnTOwYu6USGbF48W5tKf9bm5uFtqbZjq9RHQE+tR2OxsLCgq27d69u5yv7YDkBhHt9xlWTF+BzMzM2SEhIfy5vcqPq5QR0UWMqZx1Ja9uaGpqOpuTk/Mz27ws0ilm6I/n2r4YGho6aO7cudezTWwfHkhEJ8y1I1ks33zzzVbWF9LZW/EXQOC+vW5PngwdOlTYwqsjoisbqZydHvXa2to8waz4GpHPij8H8YWdrB4/Y8aMVD6rB3jNeCJ6gPF7O9m8c9euXd8LMqYU/Oe/c3YWbRo+fLiwlTiOiE5E76bNDxw4wGfzBomscYIX40HbF2NiYoYJNvsr+UQroQUAizHsBkwEzZ3S0dGRqlKpktRqtQ7iij6X4uJiYXEnpeWScTm5bk1quIzHG2+8saK1tbW2paXl4vnz52c1NzdX1NfXl+n1+vN5eXnYxYhjA0YpPpdIiUTH3vJEiGQkMwZ8P5iROerX25da3RU9VnZQhH733XcnBLJFSjPjsZUBPf5g4Ys4WSQ8PDwZIy7uN/UyceJE7v77728RXATVcr4IpER0LcvMSUDIJMzM+D0QNxGiv7NkdgQ44aVVVVX8KGKTxE4wSqyTENc5+wElXQRBIiQzWmHJQGaUGYPxe0ZmfMZl18AHSA8uKMj7u15XV6cXbErx6Wu/uEJ0JV0EgSA63loTWGZOZpk5Gcirg4MbxxfIviKzI+AcT8GmFJeA0Pvjj0jxIvAVkzAzJwnIPJjJDB0QOBaXfwsUmR2hsrKyRrApxYdTnQ/0Doj1IvCEZX2YzEiC4i/ZbDZj8ce7GT6XGb5ASUmJ8AkPbRIkuqjnggbyIuiNgeF8ZkYyY2YWWHP9hAWgVqvlpA6QLsIsLkWnQbLrmrt7EbCL28jC7IjofXkyA5G77DkBmZ225uQAthZhFyS6FqFRjufF2YsALoAe7wRqQfZqAz1thDAA2ZsgGuD7Nk5BiI6O/vUOF6DHq3uKMCWdL5yoDpLZYDKZDPDVCJw1Ms7ieIKFRSef0RtZFPagpVGi4LrfCZDxEzHrQ8ZPgOw+CGKAL1eX8jdiY2PDIKs3Ce52Ulvkp4/MiGwBEl9ua2u7ZDQa6yCqIXNfaGpqqqyoqCjdu3cvjly3smj3tBitZ1EAtxC8jVzBD85qF8bDVYWjkolA/nh2IcThU5ylcmBTUlL6FRUV8UQPkSDRJde4hSsG4+oKQGKMGiByNRC5AuqlikOHDpWDDGlmRG6znfealZXl9Gq63iBhLYt8O3cENX8h4AUAkWRzIfxqNYoBCQkJSJRSgQxokhhvUsS2Q6AAjJiRce4tEBm1NOroqkuXLpUfO3asrKSkpIHPyrZ1kTcXwPV1tsUdR2+6Bkh91E4xi7cHnP2igwsApRH67jo2eDSQOTt+uxBAusTbOE5Sw5BA6GQkMhSEdSwro7yoAglYAQVhGSsIeSJ3c0WmTJnit/0MtKzAVaNwilplD65OMF8fwAFNAGnEXwgJggvBa4iJiUkVbEZJkOijfUBkp3Wy7RIg6Io8+OCDojgwYtfPJiYlSnHgKTg42PbnqKNx0Coe7gY6vCPgNkojuBAG2WvDdVjJ9emTHB8fH8oauyLx6c0SauzCQnR4IHSyFCD1Nl20krC/Q99DodyHFcq8Y4StvDg+wNcI3VwKrBduvvnm4evXr8eedBzZxRHeaokci8k9nU+x6GQiuu+AI4U4sbmohwsBn2s0spvIHTIkk/ttZv1ACRHd7rOUgNClzz333NtsE1uP8wKlkwMJpU+l+8D2hYiIiCE33HDDIF6ng3yRgjeNkm2cvR+cOXPmR8FmhVJPtNKJfhjigI18UU2dOnUavwmRLIH/I9veuQTdXb9lyxY+g6M0qSWiKxevMRII3ZdREyZM4LN6nMizOjpFs+394OTJk9+AdOHXQz8v1WeJEtG9A1xybrVtUQpF2B3M7sSsnibSfcd9+297tRZq840bN/K1Bg58XVTySSaiW4EP79ogfCEyMjJt/vz5/HNEoyGrJ4hwv9Hbu8I7x4cAb9u2bYPZ3OWMdj2BjpaNJvAosH3hmmuumTVp0iSe4LhYp5hGS/GBuovt/eDYsWObc3NzeT1eZOex7kR0hWIAkwDdD45arZ01a9ajQPhoztquMBzIrhXJ/uKai3b3xcxSOUMnnV4iOq9zl3PWCShXIDg4ODo7O/sxnU6HTV4hjOyBHH/A0d6/clZL0S5Gjx59V3p6Ov//XC2Si5OIHmDcB5Hp6A1hYWHxTwIyMjKw/yUCYmSAyIOdoB/1VhzjjJw5c+bcx4rpICZziOgKBlpzC515I65O+/DDDy+cPHky9tagVr8OyB7hZ02egxnamTdHRUVlQDE9gW32F2kxTUT3A7BD7GXOhWd3arXa/rfddttTCxYsmAjZMpSR3dcEQml1B8Q6ztq34zSgtpgNMiZWUEyHKfVka+TStOMG/p2zs5pur6xTqdRxcXHX3HjjjVe3t7eXAbQ7d+6MhjDAsfT2841SWdF5D+fGo9JhXzVpaWnJP/7446GOjg68YCJhP6vldM7h/yGiOwAu2/Y8y5ZuAbJ7P8iYN4wZMybOZDI1lJeXI4nCIIxeIPxgiKc5qxPk0dMqYD+jU1NTOw4dOqRnxXQn7F+D0oiuWrVqldJIjsP5m1yVAY6ADw9obGw8q9frc3fs2JFfU1ODHY8YdS48khz3C1ttZ0Jc701ZCbvXsX379rf37NmDTV3YBnBUZA8ecxvOzhlVItFf4HroDfESqSy4Km9dXV0xruV46dKlErgISrEXHLJqXXZ2dnBKSkpITExMP7PZjA8JGwISYyRo/mG+nEje2tpa9corr6wyGAzoseNEijw59L74c3K0lDDFlyTnNXx4ePhgjOTk7o2Pc+bM6X7w/bhUH7pGUETf+tZbb+HzjsKZPNIr5cQryXXB2ULPevILoKAzHD58+JOioqKv/b3zJSUlP+Tm5n4C++D2snOJiYmTb731Vn5erA6yYZRSTr5SilEsOl+FSHf3F4AUOZaTk7Nm7969pUD2w9OmTSvWaDTjPSlonZVChYWF2997773vjx8/XgWF7+fp6em4LEeSG3cbVVJSUlp+fv5B1r6LbtEF4IBk2wScLUaVIl2wy2+iu1n8yJEjWzdu3HiUs07WxiYpbHnFJjAs7l7hfLRCFuj6mm+//XbDrl27sJUYM3nh7NmzseX2Kc7qraMz45I3jmMB8+fPz3rttdewIMexAFwi4wxldOkDhfJKzubZPq5mcc46O+ckkFy4qBG+voe5JNHedEnKy8t3v/vuu5+cOnXqErugTsHfFq6FeQriO4jfcS4+GToiIkLXt2/f8oKCArxgI9gYgCQ7HCmjswsZ4iVXs56DLG4PWNDh4iV/4qzWoEdoaGg4/cUXX2yFv48XFpK82EGbLWb6RznrVLrHXbmYMzMz7wHNv/LcuXNoM2LjVyP8HZNciSB3oj/CubjWCWZxIPgWvV5vYFm8yHZhHjtAWbGcs/rgke7uLBaay5cv/4htmuHvnnDiY2gRrofYD/FnzslemKCgoMjs7Oy7XnrppXWctQ3ias5OTz65LuLHMEZ0lxyVFStWrAeS1zOpUOAEyYWo9GSHcZ1vwaarUgJ19jxGeqf88X79+l07b968sWwzFrL6QCK6tIBS5WXOyf4QzOLvv//+/zCpgmT7xYFU8RnRjUbjRQ+IjsCL8l2Ix5is6RUjRoy4Y9iwYXx9MQTIHkLSRTp4inNimQoXtbjPid7U1FTnIdF5HIPA0alFzHHq0QLVaDShd999931Q9H5gsVj43vXjlNHFD+zBvtOPWdxrRK+vr7/oJaLzn3+VXfQO13OJiooa+uijj/L2az859q7Ljeg40veiowzmJS3eE6o8+fCFCxeEhGz10jH5mbO2+X7r6E3p6ekzx44dyz9IQHa963Ij+nOcdajfn1ncaxn99OnTF22cHG8BH93zLItGu0RQq7W33377/VqtVsVqm3Qgu0ouxJCTRp/FWZu2/KHFvU50tBbLysp4cpt9tFw1ZnVcou55JvG6AZ/6tmDBgt+vXr0aB6L4pxWWUkYXD1BTLglQFudssrBbkxo8tBZdwUWm2/9i7++kpqbezObFIpL9PC+WiN7L/4ADJX38qMUdodydD3nBWnQF2MS1hTkz+cIf4PS76dOnz42IiAhixzZdoo+ilB3Rcfh7VACzuFfkixetRVcvSmwheJdJui6w3vUZvKLhrL3rRPQAAj3fx0WQxT12XrxsLboCvoUAR1V/7WLE3vUZM2YIe9f7EtEDA+zPwNHPrkamy5cvHwlgFvc4o/vIWnQFSPKHGOktOFNq2rRpd8fGxuLxRfclA8iukSpZpOy6PMlZe6nri4uL161evbrMx46KT4nuQ2vRFfAtBHux7tFoNIlLliy5aenSpV9x1rYKyfauSzWjZ7JC6ofdu3c/xkgeyCzukXTxk7XoCvgWgq1arXbGypUrQ9n/NRCyen8iun+AWvGPEM/CQV+2ffv2/gHS4l7L6H60Fl0B30LwdFBQ0B/g2OLyHSexMA3wIquKIfpYRnQc1MCuuxMiyOJC4CygOpcY5V9r0VVgC8F/QIyB44wTQdCOlNykailq9F38N3DgxfrwKZz6FuPsm5uammpFTHQEtg38HzvmZlcvZMro8oVL8qW+vl7sRJc8iOgiILoIrEUiOsEtuOS8iMRaJKITfJfRRWgtEtEJ3ie6SK1FIjrBOdnNOTkTX+TWIhGd4BDYiuCU9SkBa5GITvBcvpC1SERXBNHJWiSiSx0VzryJrEUiuuwzOlmLRHRFEJ2sRSK6HNDr6ChZi0R0OQD7tx0+epGsRSK6HNDByN4jyFokoitCvpC1SERXREFK1iIRXS7ocdUushaJ6IqQLmQtEtEVIV3IWiSiK4LoZC0S0eUEJLPdZ3eStUhElxNw8sUFu+K9qkooXchaJKLLU74UFhYKMzpZi0R0+RGdrEUiuhxxhcVI1iIRXY64YtCIrEUiuiIyOlmLRHRFaHSyFonocgSuPNvWLcWTtUhEV0JWJ2uRiC57nW6xWJrJWiSiyz6jm0ymC6TPieiyJ7rZbK4gohPRlSBdyojoRHS54tdBo87OzvNEdCK67KWLWq0+J3idrEUiuqzQwDEbMSIiQo9Snb1O1iIRXZZZvZEFZnKyFv2IIDoEfiU6L1VwpNRCh4SILkeg89Is0OYddEiI6HLN6A0CopNsIaLLluihAqJr6JAQ0eUIHBHVEtGJ6ErI6GpBMUrwI/5fgAEA9BnasNkcSoMAAAAASUVORK5CYII=',
+            rotateIndicatorBG:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALoAAAC5CAMAAACoRNVtAAABX1BMVEUAAACPj48AAAAAAAAAAACMjIyPj48BAQEAAAAAAAAAAAAAAAAAAABdXV2EhIRvb2+Ojo6Pj4+Pj48AAAAcHBwAAABERESPj48AAACPj497e3uPj482NjaPj48ICAiPj49aWlqMjIyPj48QEBAAAACPj4+Pj49ycnKOjo5UVFQDAwOPj4+Pj4+Ojo6Pj4+Pj4+GhoZ6enqPj4+Pj4+Pj4+Dg4OPj49kZGQhISGMjIwAAAAxMTGJiYmBgYGLi4uPj49lZWWOjo6Pj4+Pj4+Pj48ICAiPj4+Li4t8fHx3d3ePj4+Pj4+Pj48+Pj6Ojo6Ojo4AAACKioqOjo6Pj4+KioqKioqOjo6Ojo4AAACMjIyAgIBra2tAQECHh4eJiYmLi4t+fn6MjIwpKSkjIyNLS0tubm6FhYVTU1NhYWGOjo46OjoAAAAAAACEhIRra2toaGhbW1t/f39LS0tOTk5sbGzAc0kEAAAAdXRSTlMAzD4WBMLIMTkOPCcgca6Exg1HBkc0XCYSBpmxVCIMCW4Sn0IqvpSKXkkZqqVtUkGymWg5w6uaZ0ovLSm6p5x6eWQ+LB8eGxadk4uEf1lNNAq+u7eFfnRZCbajgTG1qqKdkU1KYXtyZ11WHhQIjnNtUlFPPlvso/l/AAAH2UlEQVR42tWd+VcSURTH7/eJI2ILgxEQIYKBFJsJLbRRYFBqmlnaXrbv+/9/mqB65uAs2Cz386seznv3vPnMfffdmSHnUFUKBIglsTZNjRNLqhGKjxBLCvN09SqxZGOJJiaIJVtZOjZGLCnmKBokloShhgRLO2aAhhAs7dgAvgrB0o4R4JUQ+4ghV4CPQrC04zLwWAiWdswDo0KwtGMSwCHB0o4KgMMs7diBxn6WdlyFxkGWdlyBxhGWdpyHxgGWdlwCuNoxC3C14zrA1I4JgKsdUwBXO9YArnZ8C3C1YxngasdFgKsdSwBXO+bA1Y4qwNWOMYCrHasAVzsWAK523AC42nEL4GrHIsDVjmFwtWMG4GrHBsDVjhGAqx2vAFztuAxwtWMe8JsdqyrFA9YK1LbtqLYoECfHyJRqgTELv6/Ath1bWTU+FiDnaKH5znwkHcCmHdVlZXUi5Ow1sYzkcREdNy1Q27NjbR2vok7fddV1KLMzoX1mBWo7dkw33TkxqwGYuyHGpowL1DbsuJoEwkdF8C45TROA8kCErhoWqC3bMbGh9P/nBDlOume+U0fF2F2DArVVO7aL0HgqxDFyGHkRhi+L0AmDArUlOybKCjTWDomgg17U797uPxfnJg0K1OZ2jBXR44UQcXKFRPK39qZFcGRwgdqSHa8o6DHr4m6kofxZC4fERGCghMztmCqhz9yMmxl9Gb9Zey2C8QEFanM7FsLoo3kxdJNcIyG3zddnxIR+YmZ2XJASuiy96AoxmWBdOLwzMVgETOy4Wccf7jvoRfMb5s7EoAQY2rFzGn9Zey6Ck+Qqcnz6xCAHQztW6pC8ll50jVQYku2JQXcRMLBjN49tXPek1FGARCYGMqbbeDT7IrqvH9yV3D9/mBFR8gApCZkYJJYwmLXZo8F9dzOL2I5yQ4SmyAMWwpD0E4OxLHbn6eHpHP7hgRBXyRM2d67p6Wuww0UhzpFHnMYunDo4/e3hu6mpbixSvhTGYEafSS+6Tqc+MJj7Z86NBOgv6UhewQCmhXhPnlGBjpNHQxO6lGRhuT94770okZKWjhzojNTOxXVB82KAPKSb0wtyFyrhHelkaJw8ZWV7IG+IqIGmY0lfeHFQmjineX3SuOwnF5YfDgwyuT8jPyTMaoZqcZsXP5DnRH6vlrMWLrtM0leF65addCQWlqmu9xRtbdMq/YxRiCh5TsRmOqL53clCnf3U1/quPqVAY84HYU/17/42burNfsHL+8OxeRl0iywo0Lju/fl70X7ine+51MMVo7YjV24/yUlN27ywRw+cPHjm+PmR8QC5RjpW1cZ869+iYihg4wcUSNyZQSJWLdy5JMc8dEIi81/HZ5BItbQx34Oe4YrM85A4NYPEQmtTG7MCA+RSt9234cgMEqmqYZz1RehhmiD/7wzSMTlmyzwXYnKYHqX/NAM1FpHesMmMEPYcBcmwM5B+voU9IGwOnSDZywzUX0tk63EYPXwc9T7hR/evv3xz/Pz7qYBcgO1fqzzZn4Kv1nqfCxevvzxz/OHI+OTuv9vQFpAUokeGkaydOnLw85eHJ+LW97Ldxsr8bekal7wuGZ17Ovvpzfer8Zs0LJ3VlbJ2GSuAM3dT88W89xtrrVKWJtp7DmN/Me89n6m9fbX1OIe9Z476xewO6VRrc2Pr8egw+bpuMXtDdohdkk96fVeH2Jv6pQCWt9vp3fxdXve+mtGp26zD+CboRJs2q18+Wek9yvZrjv3eQO+J9AZjtdLrn+Xy9zhpzcopaDeJHtP+GHrezqmGH057B5y2zz0TUatnSfflZe0ZqfBwJ3iXPS+wJ0rYhmLl3FT22XnrmLLN02r/PK/UUOz0CPilGUY2VVvvzPBHC1KPZezCqdn9Wj/MeKbbXilfUjCYOQ8zsCqGRu5pPSFzS9dA9cBwpNOj+JcXXnVnbOFfrp0VxzYV7IYmzof5HTvpQ970xFQgkc3srToG8qjf+Vup+6ATaaGuC/lkT+BF6JHPA3WykHjULJDVh7xPWu+d+0fFub+3zoICydpZEXR7yczrQ/6XHAyfeIiVIHnqeg94W9GFXFIyuecnyop3z3Smk7qQG7Te6+sFjaRnjZrNASGXbJg+NUDppkftsTWDkGu8tVLErq17kbqr6wYh12hZOjpQlzxI3RcNQi57ZMyf2ozk3E7dVwxDrpEe7EY93by7qXunbhByndhNglqpu5m6n5YhN7/TmtZSO1n3UveCWcg1lgzcqKOguJS6xxSzkGuUbR3wxUqupO6JIvDUOOQaFXM37kwM7jnezr6BWz9MQq5RM3ejLjG4E3U2dV/F4juzkGukzN2oSwyU1kQoTo6hliKBsREyJTFErahWcvTFE9UMvbeU5a3r3GiOWqWAD9qrswDX9zgt+e/9MFaZ5/tWngrfdyHV+L6BasE/dXS7JBS2b1ujda5uJDrN1Y2a2Lm6URM7VzcSrXB1I9EqVzcSddi6kUjh6kaiJFc3amLn6kaiZa5uJLrC1Y1EEa5uJGqwdSN12bqRyEdNpHZJcnUjUZ6rG4maXN2oiZ2rG4kiXN1I1GbrRsqwdSNRmKsbiYpc3cj6S5tNvt83LfD9qizjb/m2+X5BWeX73WqqQw2ydGPvG+1jLN1ItMj3y/gbS7SPpRuJNufpBEs3ElUjFGfpRqJYm6Z4upFUlQJOuvEngp7208ni9ZwAAAAASUVORK5CYII=',
             rotateIndicatorPointer:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADQAAADxCAYAAACEXZTsAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OTQ0RjM2N0YyNDJFMTFFMjk1QkFBRDIwRTU4OTdBRDgiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OTQ0RjM2ODAyNDJFMTFFMjk1QkFBRDIwRTU4OTdBRDgiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo5NDRGMzY3RDI0MkUxMUUyOTVCQUFEMjBFNTg5N0FEOCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo5NDRGMzY3RTI0MkUxMUUyOTVCQUFEMjBFNTg5N0FEOCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Psfyr6YAAArZSURBVHja3J1bbyNJFcfL7cT25D6Jc2EmziYZVqBhGFZCCBADgn0cHuYFaSUekGbeQbvwlskH2BeyCAkeeED7AUBoQPuOhBBCgoWZZYUyuV8mk/iSxHZ8ycVuTsVtuTfEdlXXOdXVXVJPOnH78vP/1L9Ona7uidi2zcLULBayFjqgHpGDfhOJqL7P0DL8s8RYmf/yU8YuZJ68dOX3Tt2kR9MX9wZs/FvZdH4v+KoQQpt2gPbDAjTj/PzUiD6ECHQjbEB9YQNKhGEcGoWtn28pxm7yLxFsOBZkoJTL6saolbI0hhunGac2B61Ag4xNhAoILC5J7XZagRKtkAt0H7rd3Im1FApsyE24wwuSudgsY8OwG6Wybmqg6WvkIlWJGmj26h+SrX7UFwqFBgKu0BtX/wCyTFI6nXaFYq30J3AKWe48zg0UdYCWGrPYwABNsmusGQh65xpZt8UIrJsSaKbDSEvmdL4A3STMui2dhuCybrKczheFbhCORb4AxQMIFHVn2VdbLwDFGu+dwLZuKqBbrENFCQis+UbxxMLuR1RAqW4HfI7I6aiAprsdMNLqR4FQaLbbAQNhU4jKun1TKN4qafWZDgSuzKYEDhpJNOw9voT4OSiAbgu+rvVmI+wimMZAAZQSPXCCwOkogGZEDxwhcDpfgQYISsO+AiXCplCcYF6EDcRrBOOiB0P2OjzYsPkElnVjA6UkXzMyh3xWz/Ir3JptErkf+Q40glwB8h2o33CFUrJPSBgONC37hBhy+oMJ1MdaUwLhBtY9NNKwe551R00Cmvb6xDnEARYTaNbrEycRnc4IhYYQp+OYQDNen9iPuMIEEyjl9YkJxPTHCIViBvYhSJovz8p5auDVA+MNdXqXFBclWn6r47JulH5kDFASKQXCAppWfQEs6zZGob6wASUMCzlloJhBQDcd21YdP27cuizVXS6D7vUTKIWkMl/ppNyPMICmsYBGESZ7GECzWEBDCCmQUQr1GRJyaAolENIfoxTqRZiKqwIlGe6pkOYyaM9XsKgCoVl2s91SnOypAs1gA40pOp1xQIOKKZBxQKrWbVwfivuoUATTsl1ZdzLiE9AEI1gz6iyDHuGfbelSMH1A6P2n2VSuYDESaFQhBTISaNAnhVJUQDd8UmiaCiiucAWLVyCLUiG+DLrHWXYmuwzaK9AUUyhkCFh3dL51BUtcB9AsI263PS7htEzrP83mdRm0V6AUNdCAR6fzCjRDDZRoXEoQKiBtCvU0Zsq0DSx0NN662MOiBOLLmKOMvlmfbwywUsugLRMNwTXYSZe1jAbysgzaMtEQmq3fQ9ZtNFAibAolNCjEy7OTuoBgfLjZ3xgm4qKfVRZomum9a2DkjuQVLF6AtLYJybCTBZrVDSRr3cYr1B82hWQLJsYrFCNUiLvMuG4gfgXLsLMMWuTzygClGME9RETanERZSwZohvnUJiX6USCAhiWu1euhALIZq2UZe7HO2CdrjH0MP9eh8xW/CZ8NOsNX4PHvwTf5bdGJYr/EvKhHsg91bQDy/HeM/fFfjL2EXzds2666Hi7CtgvbRz+LRPgX9B5rgKFl3RYWEHzr9U8Z+8NTxj4EmH8AyH+vwHym/dy2t9nlfZDZrxtPx7FuUSB+W8+xTge8YOz3v2TsL7C7CiCvRF4UoGzYfgu7v+p0HMTl4Ggj3GLdwtTC6D9pxv4JX/Pf+C58xteynR6gPoQff+1i3UIqKQNBrJxDn/kIduu8zyiY2S9gq3XIuoUWZCgDgTrPnzN2DLsZUOfUKw2otNFJpSFBp7NUDWGVsf84uzmEIefPAtaNolDbpPTvrTDDuCn4i3YPxAUXNYkCtZs22MuNsYXfR/4MASjbAUjofJHQwFr+4IP2fr64GC2VSrVIJGIBVF2pyrOw0HaNXL0OL/3++2jTh612RYz5+fkhZx/jFGWy3QOnp6dN9SoYQLvtHrh7926zfw0iAH2x3QPVajWDCbTd7oE7d+7cc3bHEIC+2+6Bk5OTJlCZFCiZTL517949vthoHPpR3CvJ06dPIRlg32r3eKFQaA4LVdKQA4jeR48efd95rTkFdX7SKU9Lp9N6Qs5R6atPnjz5Bs9QAHDKgzo/6jaNWFtbS2MC8bHmqNMBEHY/ePz48ddh900ZKID5Ifz4cadjarVaGRTioXbOuvy/KzITvB3W4UpIPg7dv3//ncXFxS88e/bsT/A7n+Ctt8vvAITnh+/C9p1ubwyWLaSOLBDvR/e7HTQ2NvYWKPXlTCbz8fr6+icPHjz49/Ly8urU1FTp4cOHw9Fo9EsA+bZlWW+LTsHBsrMUQJuiB4I60YmJia/xrfk3AHQ/LtXHXJbdFciSVMiXBpadFbFsWaAdv4AODg6EBlVZoG2/gMCysxQhV4LtUDcMWPZJNpvloXbWaYruBciXsAPLFjYEL0Daw65SqYQLCCaPwg7nBeiVbqB8Pp+lVGhTN9D+/r6wZXsB0j64rq6uZihDrtypMkNg2YWjo6MzUcv2AqTVumWSUhUgbU4na9nGK1Qul6Us23ig4+PjrIzDGR9yYNnpUIUcWHZOBxCP5zQ1zMXFRR5Cjts1r0nUKYG0DLCitWwsIPIUCCw7LetwKkDkSSpk2TmdCpE7HaQ8Ukmp8UCuLFuLQtwUKP/Ld9tl2Vr60CmldZ+fn+cLhQKvY1cXFhbqOoBIw+7s7CzjRR1jgVxJaUUnEJl1uwojWoHIBlew7LQfQGTpD1h2zi+gOgGPvbKyknWGBa2mwDPhAwLLPjo5OeGnHU9lLVsViMTpvGbZWEDokz3IsqXrCEYDQbhJ1xGMDrnDw8N0qELu4OAg52fIvUK27vry8rJny8YA4hnxPqJlH4Mp1LxaNgYQagoke/qRCggtSVXJsjGB0JwOLDsdKiDIso1QCM26X79+rZQlYAHtMcGza90s++XLlzkVy8YCunCgVOsIR9Vqte6lMIINhBJ2GJaNCaQ8e3Vl2UYAKQ+uxWIxHSqFIMtWdjij+tDe3p5RIbfHuiw/7lgVse36ysrKoZO5G6FQTSWngyw7C7Zdd7Js2wQgpX6kWhihAvKc07my7HIogMCyPZ9tMDLkIMvOmQi05dnzd3bSJobcvlNjkLXs2tra2pFj2acmAdW9hB1Ydg4228mybZOAPPUjL4v8dAJJOx1YdjpUQK5adtVEIOmQy+Vy4Qo5sGxPS2B0AfEzesIXuYNlX7gs+8xEICnrhgw7V6tdFowqGJZNASTVjzCzbEog4fpCqVQ6wHQ43xUCyz4MgkLC9QWw7HQQgISte3t7OxB9KC3SJ8Cyz8Gy+e1z6uBwpyYD2SIFE7DsLEChqkMFJBR2orfkCAwQxulHnUBdrbtYLKJm2dRAXesL2WwWNSn1XSEKy6YESnf6oPy2UxsbG3nYrYFlnwUBqKNKPCmlsGxqoG0By66GAqhSqeQo+o9vIVcoFDJBBGqrUKZ1x5VyKIB2dnayQexDuesUqNfr3LL57Q8vsC2bGujafqRy5YkJQJu6smzfFIIsOxdkoP+rL+Tz+XSQgbY7ZNnhUAiy7FyQTYHX3Uouy65ubW0VqSxbB9Bnwo7asrUDudbElYMM9OqawkigFdp0WXYmDArturLsbKj6EDgcSWHE3Xo0APH69eU9uXd3d/k+A8s+DzKQW6UK9RvpAuIZQyRsQKFSKLQhVw2bQmXqN4o4JdnQNIuFrIUO6H8CDADtKO5SoZAASgAAAABJRU5ErkJggg==',
 
             arrowTop:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAdCAYAAADsMO9vAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6QjNFMkVGMDEyQzI0MTFFMjg3QzRFMzA4RUMzNUU1M0UiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6QjNFMkVGMDIyQzI0MTFFMjg3QzRFMzA4RUMzNUU1M0UiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpCM0UyRUVGRjJDMjQxMUUyODdDNEUzMDhFQzM1RTUzRSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpCM0UyRUYwMDJDMjQxMUUyODdDNEUzMDhFQzM1RTUzRSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PlvCjVAAAAD/SURBVHja1JjRDYQgDIbZgBEYwREcgREYxREcoSMxwo3gCHc+0MQQPCgUKCT/G8r3GW0RpfoNfceHaLXYQPhvyFISJoJ/Shjp8NudKwGPucKcJeFFS9hC+KeElQLvCOBx3Mrw0yVOBnjMORoeGOExIBEeKuYP664UGIpEl67dAj9dwjDA10o0bz1KuyulmlCqV1PXpsK7Tv2jSsJ2hK+VsD1u3NpJ2dcaCc++JvXj2hnL9N5aLGBUZWAsGiAJvknCC4GvkfC4Tchd8Bn8G7iFNXMPVJdYzzoS+bf/Sr4NThB8TuK1lB4CD6NiiaPkh0XaSRpKQOlkiceASa6fAAMADgHRdvHjSZ0AAAAASUVORK5CYII=',
@@ -11902,6 +13178,8 @@ ImgOps | https://imgops.com/#b#`;
 
             fivePointedStar:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAAUCAYAAADRA14pAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6QUY4RUQ3MDQzRTA1MTFFMjk0NEY4RkZDQjhEODM4QTUiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6QUY4RUQ3MDUzRTA1MTFFMjk0NEY4RkZDQjhEODM4QTUiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpBRjhFRDcwMjNFMDUxMUUyOTQ0RjhGRkNCOEQ4MzhBNSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpBRjhFRDcwMzNFMDUxMUUyOTQ0RjhGRkNCOEQ4MzhBNSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PkpRrF4AAAGOSURBVHjaYvz//z/DSAIsIKKsrIyQOm0ofRWfoq6uLjB99uxZqphnbGwMpqdMYaSKeTk5/yEeJgKEEmMgCWDAzGMi0sBwKKYWGDDziPGwHhBrQLEeFRw3oOYxkZBc0NmUJr8BMY+JyOQCA2FUSn4DZh6s0FIAYg4g5oby+YCYGYhlgVgVSb0aECcC8WMg/gvEn6DiX4H4BxA/GOzmwTysC8RLoAYRAvOwiIEMjkFy4KA1D5akNwOxORDfJCNJgfSYQc1gGOzmIefhG1BDt5BgGD6HDErz0Autj0DsD8QtQIyvzfkfqiYAqgcXGHTmYSul/wFxLRAfxWPgYaiaf0SE8qAyD1e1xAPEpngMNIeqIRYMGvNwedgBiNnxGAiSsyfBgYPGPFwe9kLLN5FAHIGWH7xJcOCgMQ9Xb8kNSh8D4mik+vAkEC8FYiskNcSAQWMethhWh7ZsmqHJ4gGS3AOoWDNUjRoRjhtU5mGLYU0gdgLiQzgs/APEdUC8B4i1gPgWAQcOKvMYR9oQD0CAAQAKvKHlERqdgwAAAABJRU5ErkJggg==',
             lock:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAMAAAC6V+0/AAAAOVBMVEUAAAB2dnZ3d3d3d3d5eXl8fHxzc3N0dHR5eXl5eXl+fn53d3dzc3NxcXF2dnZ0dHR9fX13d3d9fX2pDWFRAAAAE3RSTlMAqXCZJy6vvllLNWXZooyCFXsZospBZQAAAG9JREFUGNN9z0sOgCAMBFAEWql89f6HNdKAxSCzYJK3YEAt41JyHyoYnYtYBoz5OXOUBsiNIJASdyK5krmz2PIh7DUh+GbaABw1AEYref04qTb7ot0GJJrgqWfoJ3gVxuWQfFJDj7oH+5fI9JD6yw3ZiwMeFNafHgAAAABJRU5ErkJggg==',
+
+ filter:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAMAAAC6V+0/AAAAmVBMVEUAAABwcHBDQ0N4eHh5eXl6enpOTk5sbGxgYGBsbGxgYGBPT098fHxzc3NlZWVjY2NPT09JSUlfX19/f39sbGxvb29qampmZmZjY2NkZGRgYGBoaGhcXFxwcHBra2tSUlI/Pz9xcXF4eHhvb29vb293d3dnZ2dubm5xcXFeXl5hYWFZWVllZWVVVVVfX19UVFRQUFBGRkZ8fHylyMz5AAAAM3RSTlMAuRnRth4boZF4UjTRyIphORcP0aaYmJWGhH1taV9eJgjRwLqqp6KYgYB3cGlXSUM5IxRjGaTQAAAAlElEQVQY05XP2Q6CMBCF4SNF1BaQXRFZ3Pf1/R/OMU1b0ju+m5n8F5MMBnhsR0bmyMhE7Cjdbi9jsIbBbnJ+/JVKnr9Uq8NCubTUtIQtQER6RU8XUH0xedwIONI7LFUFl0Y4IaGKszncMRB7JLaieEdRJKxY5kVxKnV8/qPlfEwOFC9Toh9ssw1LAF43Tc2h8fyL4X5A1wgjdDdVWwAAAABJRU5ErkJggg==',
             brokenImg:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MkZCM0M0MkM0OTg2MTFFMjkyRUJDMzk3ODcyM0MwOEUiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6MkZCM0M0MkQ0OTg2MTFFMjkyRUJDMzk3ODcyM0MwOEUiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDoyRkIzQzQyQTQ5ODYxMUUyOTJFQkMzOTc4NzIzQzA4RSIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDoyRkIzQzQyQjQ5ODYxMUUyOTJFQkMzOTc4NzIzQzA4RSIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pne+/t8AAA/4SURBVHjazFp5XFXV2n7OzAwyCCIYKGgOOIJSamlf1xRMszJkULNQBjWHnH637pifDXbTMBE1za5DpjnkmHNaV0UxxQEERQEREUFQOOdwOMO+71rsczxHOXCsP75v+Xt/e7H23ms/z3rf9Q7rKMGT7TmSaPzftNskO0j0jjwsCAKk+P/V2pOMIVE4+oLc3g0vLy/XmpqaUQ0NDS2ugMlkYlcJ6xuNRvO4hPXFMX7PSix/QyJBg1qjMBga5PX12toBzz23RSTxuqiJxt9NQKlUqugS5eTk9NTLaDAYODFrYYSsr5wAQ9jYgAf369EhOBgFBYW+Xbp0zqThQFETrZKwS0Cr1dpc7TUJraJ59c3AmiPQnLB3TQYTtDoN5Ao55HpDWF5e3tRu3botd5SE3JEVVcqlkClUv8OkjaKYbK8CCREAMzmZDK6Sh2jr5QqJfwCuXS/qdOXKlandu3d3iIRDBGS0OheLKjFu0VEE+bo1o4ZHe4KtqlkrEnaD902PxsT7JhPrA1KpDKXlFfjhg0B0DfNE+/btUVZW1ik/P39q165dzSTYntjeHAm5I66KPoPSynrkXy5BQ4g3H2cA9KR+nd6IhkYjGg1GMh3RtgX+oigWW2siaqSBRgNDDqjkcHNzQn15LaoeqPljLi4uCAoK4iRIE9NIE1/RcDt7JOQtAOfr2rSJJZDLJJA6K+Ht4QKNTo86jQ5+3q4ICfBAp0AvhLX3QhsPZzirZFDIpFApZCRyqJQyboINBFqt1aPivhoDurVDJ3r+g6//g3p1I07l34WLc5Pn1Ol01iQ6kiamkyaW2SMhaSGQ+RKJP9tYSsRCtA/3g5NKgQXxUegR5kOgDKQFA9eEwWjimjEJoovl7hJcC3q6V1unQ2T3ILzQw98y58pduWjQC5j0p07w8HAlp6Ej5dACqFTQaDSMBNvwN0USrFWQbGMkWgpkzFfHss7gwYOR8eXSpo8tHoeqej0+GN8fUqUU2Vfv4sKNe8i/VYMbFQ9Req8eZdVqlNMq36nR4G6tFpUPtCijv6+U3EdoB18O/vTJX+Df1o/PmTKqF05cKkd5TYO4ycE9lLUmiFBoQUHBdBFbAMkbJCp7GhhI4JewGJCeno4VK1bwwT07f0Ds6Dew6XgJTuWWwJ1UzsyktdZI++IukfmfyI6IHxqC4qJChIZ14ff6R0Ui+8xZ1OiA6zfLEfVsoN157twppz1mLO7QoUOGWROE8zvJY3YvJR++Wy6Xx6SmpWFlVpbNJDu3bcHo18fi6OVqZGw9g/Y+rtzm7TWd3oQ79zUYHt0JycPCcPN6ATqGP2vzTGRkP5w9m8P72w/mwEUp4YtjYmtLtmggG2nnqYJSJkBnEFBRUZH90ksvfS/iXSK3Bk+XdQz8u8nJWLtmDR8/N2oULpWW4u0LF/DaG29h25bv8PrYcbQpo7B4czaC/dyaJcHA365S47XB4Rx8cdEj8PNCQjD3+efht2kTcnLOoW/fPvjtt/N4cWgk+r7zHdooG6EwPkBjgxZVtfUYGqbAgI4qNBilCA4O9nrCC4ngvyVJmjBhAtavX89v7ho6FGGhoejSqRPuqtWYf+0a3ngrHtu3SjDmzTgyj3745/rTCPa11QQDX16twdihXTA1hq38VQLfld9L9vfH38eMgY7sPOfVVxG5ezfOn7+Afn1749xvF1CyPh5RM/egnW8o3F3kqKh8iIF95Ojtb0BVnR4KhcJoTUBK4NmX/83AJ40fbwO+f9euuFpVxWXyiBH4NDyc32MaYJp4rX8A/jd5MGo0Rkhlcrg6qyCXK/CwwYiJwyMwZ3QX3CjMswH/RVwcCqqrUXDvHvwpaDESrP12Phd9+vTi/bNLR+J+nZryJAOc3d1pIz+Dnj170v0+LNAZbAiIK58YHx+PjRs22IAveUBqpLxG29iIGzU1NiTejEvA1s0bMaKXDz5MGoBKWh0NZfHVagPihjyL9OGhHHynLt1twBfV1qKePIye0oiyhw9tSFy4cBG9e0Xw/q+fjsB9ihFqHeE1NUJHWTGtPsuSjY8TSIyOjsbmzZubJhk9GkN79bKAtyR3zZB4Kz4J329aj2ERbTB3bB9cLq3Fq9GhmPKnZ3D96mUL+Hf8/GzAW7JWkUQI7YkKWkDWci9ehrOTkvePfPQyjGRqSvJ2JjF7NWex1gSEGTNmWAa25OXRjpdxeSJDtSbRuTMfG5c4gZN4JcIbuz6KRforISjMu4jwrhEW8EsJ3OPgzU0hfmt/YaFlbN6c2fz6S949ykBYVJfSVWbJox4nkEzmI/z88898YBFt1Pe+/x5hbdrATaWyT2L4cHwaFvaIxOZNCPUEishVduneZMtv+/q2CN5ZqURHLy+sOnQIk86d42MrlmfgHws/wZH8OnyyPR9uLkqemkikEh6hnyBAA2sZiRdffFE4ceJEU8Sl8D1n27bWScTEPCIRn4j58+cjTHSVDHxGQgJutAJ+7dGjmHPlCh/LylyG1PTpOF5Yj1X7LiE80B2+HipKXZRcEzIZ14LwuAZgJkFpwx8i8dlnnzWB9/ZGRmIiB1/XEvjDhy3gV61YjpS0aThVpMG3B/MQFuAGbzclXFlyKKXUm1a/WQ1YVVYWEudEdTISs7dudYjEwo4d+ViCpycyyB07BD4/v+k7K77C5NR05JQ2YOOxqwj1d4OnqxJOlMk6U8rNUjYrDTRPwExi586dH/ft21e4dOkSH1tdXo73f/ihVRJTiMS35L2+TEpqAt/MYUBz4FdlZWJK6lRcvK3Dlp8L8QwFRU8XBZzI8zBxJRIsxkhb04C5jRkzZs8Waj169EBubm7TR27fdkgTXeidoqcAv3pVFianpCGvwoDtv1xDBx9nAi8n4FKLuFDWK5DZmwmQFoQWCbAWFxeXfezYsT0s+p0+fdqiidktaEJPMcMs9sB/ffCgBfya1SuRPDkFhfcM2HX6Otr7usDdVcELIGtxUsk5THsasFuRUcZ3kYLGyAEDBuDMmTPo378/VpMmJKSJL5mNU7GhMZlaTadV9MFnKK9fTTnPvIICPrZh3QYkTkzkx2+XCqWICArhh3EGk45qASOvkxUyJ6o4neHuZEAbVzlVdVp+AOAwAVdXV0s/KiqKm1MvsvFVpImHK1diAYEqp6jY0hkgC4VB9MFP9Hp8TLkPa5s3bkZcQhyWHv0cH+9ciQnRMxHeNgK+bu3h79ER/u4S1BDW65X5KKnMxa9Fh+Ekm4pgylgFqeA4AXOrr6+nwtuNJ1PLli3D9OnTsZns3J9kQCunTozAf0g+Fv9OJNfKwN9uvI1Zs+cCFDKWHZ4Glu7YnMCYmkotuQ913YGON4MRE9WHn3I8vgdaJcDAs3bx4kUOnjWWerHMpdRSBNonEEnyHgkrozZu3IjY4bGIT4rHzl07kbAqAf4Sf/I0LjQPbVSTFAb65+HtAa82nhSFPaEQJFAZZTYHaQ4RUKvVlv6pU6fwPBUgEI8FPiApceDg0ihW4Aniae2/WH98AvQ6PSa8OwE/TfsJ07ZOQwjl/q5k7yb2j1bEQ+GGNrT8zMPc01ZCa2qwS8Du6TTlRr3Z9eTJk82C1zh4Nsc+XUYyluR9cWxi8kSsWbkGgwMG4/ORi3Gz7CY0dTrIG1VQGJRQa7QoqS0hl3wTRTXFCPBQPZ0GduzYEU25Ucz58+cxcOBAh8Bbn4frWyABURPJqckQqOZNTkvGX0Y+QPK/kxHuG0Yu2t22mK8rhyZQa02g5T2wb9++0SNGjBjL0onIyMim4EbCDoiK7YB3Ec//9pCMIilnm//xYEdyixVCViQmp0/mh8Ip01IgjBeQtCYJ4X7hcLcioWnUwKh/VMOwWGCXAPn9KSwdJ5uXmM3GDL6UXmwk1yo3FxQssFCFpNJqEUgxgZ2JryM5RsIONMucnaGh5wWK0oIYL5izuUP50evkVtksX5CkTk/lRQq/ThKQuCoRnf07W0gIBnLVgr51E6JJUlg6fujQIcmwYcMs4BewjejhAXm7dpBRlOWnYRRQZAQQlZXwpfp2pQie7xmSWQwcESt3coIkNBRG6pvoXV6Q0LvVlHaMEeMCI5H2XhrXxNSZU0ktlJpnjmsi4eTOV99gMtjdY1IRfCoDf+DAAQv415gqSO5TzaqiYlpJKYTSxwfOAQFwpcxTTl7Ku6ICq1haIE62cOHCJgcgkmhHQGVVVXCj551pAdj7Skq1najeVlNFN1p8jrVps6Zh2RdfIS4iDptSN6GwrBC19bWtEiCLENKY1vfv3y+JoYySNTbxXGbH9CE3ir4GAivQCjGTUVJO00Axwa2oCKvpmbXiRD/t+QmvxL6CKe9MQdvAtjhOY6ww/JzSj1rShPsLL6CRCJnIpFhuL6OFMNBcoyhNYebEDi/fe386acKAmXNnwjjViPFLx0OikrSqgczVq1dbwL9L8jdmay+/DO/YWMgpZWCr7xwYCA8iZCguhoK80xor8Af2HODg913bB792fqi6XcXHj4uu04PI6nJy4NmtG1yCgrgW5LQ/PGifuY4di7eY9sS5Zs2bhTkz5iCpTxJ+nPkjhBqhdRMyn0hAPJZmW86TkjdnZj5UGrrQ1YtS5cbLlyEcP86Bm8Hv3bUXw2KHIWV9CmJHxaL/wv7wCfTBrZu3+P0TojadqL5QHzsGr4gIuAQH83nZ/F79+vHnelmBWrehaUf1DOpJu54cSHVpiwTWHjlyBFOmTOEDtIewm/1gu2gRpJTvtCFX6k2izs6Gds8evlm/EV/eRiVnzKsx+Cb7G/6RSfMmIcAzAIsOLEJQSBCuXbtmIcH2k4Qieu2uXXw+bwKulMtxc8EC5IrpCT/wpey3qroKZdoypGxMQdzbccgcl9niLzDsKH2NwHZyaqp4mg/hryQHSSq2bhUKPvxQOEL9t8V7TLZv3y440oqKiizvDCb5hSR3wgSh+tgxYT/1M63mHBAdbXceSj/4VavVnhH3/izLGZFI4mv2QFp6umXCv5CcIqGSRpho9aG9e/cKT9Nu3bpleXcQyVmSk4+BHzhokKPT2RCQm8MzNWY9Quby5clKqqC+XLoUH7F8nuS6eP7IT8vI3KjYYd2r5LlK2C8pVsFFsP5tTU8Ba9CgQf5BQUG9q6urJT7kRn+le/8kSReFtSFDhoAqQNa9e/jw4fMKhcL0RNImlQosM6as+E4zvy8+0kRdXd0Od3f30fPmz8di8ZjE3CjI4WXyTidOnNhJudIJR39sXbx4ca85c+aMr6qqkvr5+dncG0qLcZQWhdoVAr1OTGIdauz3geZ+oemTk5PzRb9+/YbMnj0bS5Ys4YO7qSQcOXIkMjIyvpsxY8bBp/3FOCEhIZLqgbTi4mJpKEVn1l6g2HCcvFpNTc15b2/vTDHbwFMQWNfSxl7B7Irig5CVlWW2v5l/5H9y0Ptvsv2YnZ0thISEmOf8kUT5O+dr1TtlWW2ePwTeat6xJIY/Ct5M4L8CDADd5n9SL0lNMwAAAABJRU5ErkJggg==',
             brokenImg_small:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NUZFMjU2OUM0QjI4MTFFMkJDMkU4RUREMjg3OEVCMjIiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6NUZFMjU2OUQ0QjI4MTFFMkJDMkU4RUREMjg3OEVCMjIiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo1RkUyNTY5QTRCMjgxMUUyQkMyRThFREQyODc4RUIyMiIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo1RkUyNTY5QjRCMjgxMUUyQkMyRThFREQyODc4RUIyMiIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PuqVBnIAAATpSURBVHjarFV9TNRlHP/87v04zuMEhDsQEATithNEjRcnIqSHprxo09VUEC3zj5zNLG211lpuDVtzOWvWrOZcm6tpBkvI0HaKpFlwJcIhd8DxKl2Hx8u9cff0/R1YHqNWW8/2+T3P8/09z+f7fb7P5/v7cfir7ScI8d+an1BH6HrUyBgLWbSfDE6C79/A55qYGuzrfqBUhr9Je1NnE4tmRSB2e9yiWx2/QyEXg3fs9njh9/vh8U73Xp8PzB/AuMuLLYXp86wWy5G4+IVCj8dzhvZ3PCSaTcz9eM+Bguc/R4RaBlW4FPPkEigV0uBYLBDA4ZrCKn0cPqq7g3CFEmWr08VWq/UVnU4nGh0d/Yw47oYQa7TaWLfbJVmi4bC+SI/yXC3UCjECFHYgwCjSAPwCCaoMqai/cBYvnauGZ9wzvVejEfX22g5mL80U3Ouy8OR3uJmc6FvN5uas9PQwfm4bGcYXzZPotPRBKuIwRUf3QYIju3Ow/YnHYbxxC3k5y1HbdAtfX2zCA8dv0EYpkLRAPrYid+UbxPeegB5Zza2t13jS7w0G1BcWYmF0DMqyOMjnR8E0MI4Oux8HK3OwrSgbsvZODFZVQWm+hw35y5G1Kh9n2+S40jEBj3tS+mdSjUajkw+6yWBg7bt2sV8qK9nFwkJeL6zTamY1DXY2OMXY0swMZlCr2N0dO5hp505mq65m66RitnqZjplHGDt+wUQxMjfte5FXhSAjI+Mm7+Ci2cznBK6pKSQlJKCuaA1SF6Vh7aIRFOnTEN83hOObyjAeCATz3n//Pho8Prz29lFcahmETBKqAkFkZOST5KH+nf5+nLh8GUqRCG6SVXz8QlwqLkZW6mNId4yhZmMpxsgeVAaR5tbW4qqxEY6YtbAOOKBRhYUScxzHX22pra+v7RxFU1NfHyT3EokmLg7GigocLSnBGJ1EQqT24WGsoTXGpmvwLliJ/v4hxKnFkMrEIcRBuRG5l7qPKfKaiMhIob+xEa+uXw8nx0Eik2GMXsokEtgHBlDc0IC2ti5IYpJh6weyE5Lh9jJEhruDApurQPi6943a7UJyBM2pU8iYMfJNQdhGeOv9D3Bd/B2ePZgCmWD66yJVClGcvh1fpn2KuYj5s0hEKhXKaVBA4OUSeGThJ4RdL+zDjRsmnDz8Ia6aGiEXhkEukFOx+ENzPFMgYYMOx76wqChBudOJ3WQbJ8gJfBrmzThQEU4T8vKWYHG3Dos1abhp/QHXu4ywTw6FEhMpf8pvNWp1yia7Hc+Fh4OLj0eEVhv8ouzlhcmTyuWQkQxjY2ODka8rKUCufTUqsrfA4XyACc9EKHFPT88Vyml+NU0O5edDRQqIzczET3RRL/MRk2Z1ZVux1+WCglQRXVAA/ebN+EooRGn5WizrXoqt2Vsx4hwJJR4aGkrkB3pCAklLq9fjm7o6HKb5rzYLVryrw7ZjTyG5ZAM2d3eD2WxI2rgRKTk5UPOpOUOXHJeBtOi00AqhVCS39/QM8sPjhGPTkmFztaeplKPoXbNGw+ZT/0xV1ewlroclLaI0WGiQZ+rs/HlJamoE74zK1pGQmHjC1tvreDQIs8VikIhEhtzTp1G9Zw/2HzhQS/sb//HnZTKZUlpaWnqot9y+fTuJTNK54HK5Xj9//jybnJw89Hdr+Ii52T++/6v9IcAACHxjGrCZJqsAAAAASUVORK5CYII=',
             maxBtn:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC4AAAARBAMAAABQu4N8AAAAHlBMVEVYWFhmZmZpaWliYmJUVFRbW1tfX1/l5eVra2szMzOUEp7mAAAAaElEQVQY02PowA4YlLADnOKCMCA5EwgmwngI8XIQQIgbQ4EhWHwyiAUWN4QC43KQnskgFgjA1UPFQSxhIGBIgwGw+DQgIxkkhyEOBQyhMAC2dyqQEYZFHM5jwASsYHFSgQsGcECIYwIACZtXpfywXDUAAAAASUVORK5CYII='
@@ -12092,16 +13370,153 @@ ImgOps | https://imgops.com/#b#`;
             };
         }
 
+        const blobUrlMap = new Map();
+        if (!envir.firefox) {
+            const drawImageProxy = new Proxy(unsafeWindow.CanvasRenderingContext2D.prototype.drawImage, {
+                apply: function (target, thisArg, argumentsList) {
+                    let image = argumentsList[0];
+                    if (image && image.src) {
+                        thisArg.canvas.dataset.src = image.src;
+                    }
+                    const result = target.apply(thisArg, argumentsList);
+                    return result;
+                }
+            });
+            unsafeWindow.CanvasRenderingContext2D.prototype.drawImage = drawImageProxy;
+
+            const createObjectURLProxy = new Proxy(unsafeWindow.URL.createObjectURL, {
+                apply: function (target, thisArg, argumentsList) {
+                    const blob = argumentsList[0];
+                    const blobUrl = target.apply(thisArg, argumentsList);
+                    blobUrlMap.set(blobUrl, blob);
+                    return blobUrl;
+                }
+            });
+            unsafeWindow.URL.createObjectURL = createObjectURLProxy;
+        }
+
+        function getSaveName(url, name, type, data = {}) {
+            const original = getRightSaveName(url, name, type);
+            const img = data.img || null;
+            const pageTitle = data.pageTitle || document.title;
+            const rule = matchedRule && matchedRule.saveName;
+            if (rule != null && rule !== '') {
+                const link = img && img.closest && img.closest('a[href]');
+                const context = {
+                    url: url,
+                    pageUrl: data.pageUrl || location.href,
+                    linkUrl: data.iPASrc || (data.imgPA && data.imgPA.href) || (link && link.href) || '',
+                    img: img,
+                    title: pageTitle,
+                    filename: getRightSaveName(url, '', 0).replace(/\.\w+$/, ''),
+                    description: data.description || name || (img && (img.title || img.alt)) || ''
+                };
+                try {
+                    let custom = typeof rule === 'function' ? rule(context) :
+                        typeof rule === 'string' ? rule.replace(/\{(url|pageUrl|linkUrl|title|filename|description)\}/g, (_, key) => context[key]) : rule;
+                    if (typeof custom !== 'string') throw new TypeError('saveName must return a string');
+                    custom = custom.replace(/[\x00-\x1f"*\/:<>?\\|]/g, '').trim().replace(/[. ]+$/, '').replace(/\.(?:jpe?g|png|gif|webp|avif|bmp|svg|ico|tiff?)$/i, '');
+                    if (custom) return custom.slice(-200) + original.slice(original.lastIndexOf('.'));
+                } catch (e) {
+                    console.warn('Picviewer CE+: invalid saveName rule', e);
+                }
+            }
+            return (prefs.saveNameAddTitle ? pageTitle.replace(/[\*\/:<>\?\\\|]/g, '') + ' - ' : '') + original;
+        }
+
+        function downloadImg(url, name, type, over, data) {
+            downloadNamedImg(url, getSaveName(url, name, type, data), over);
+        }
+
+        // The name is already resolved; retries and batch downloads must not apply the rule again.
+        function downloadNamedImg(url, name, over) {
+            if (/^blob:/.test(url)) {
+                const blob = getBlob(url);
+                if (blob) {
+                    let ext = blob.type.replace(/.*image\/([\w\-]+).*/, "$1");
+                    if (ext === "none") ext = "png";
+                    try {
+                        saveAs(blob, ext && /^\w{2,5}$/.test(ext) ? name.replace(/\.\w+$/, '') + '.' + ext : name);
+                        over && over();
+                        return;
+                    } catch (e) {
+                        _GM_download(url, name);
+                        over && over();
+                        return;
+                    }
+                }
+            }
+            if(canvas && (/^data:/.test(url) || url.split("/")[2] == document.domain)){
+                urlToBlobWithFetch(url, (blob, ext)=>{
+                    if(!blob){
+                        _GM_download(url, name);
+                        over && over();
+                        return;
+                    }
+                    try {
+                        saveAs(blob, ext && /^\w{2,5}$/.test(ext) ? name.replace(/\.\w+$/, '') + '.' + ext : name);
+                        over && over();
+                    } catch(e) {
+                        _GM_download(url, name);
+                        over && over();
+                    }
+                });
+            } else {
+                urlToBlob(url, (blob, ext) => {
+                    if(blob){
+                        try {
+                            saveAs(blob, ext && /^\w{2,5}$/.test(ext) ? name.replace(/\.\w+$/, '') + '.' + ext : name);
+                            over && over();
+                        } catch(e) {
+                            _GM_download(url, name);
+                            over && over();
+                        }
+                    }else{
+                        _GM_download(url, name);
+                        over && over();
+                    }
+                });
+            }
+        }
+
+        function getBlob(url) {
+            return blobUrlMap.get(url) || null;
+        }
+
+        function blobToDataURL(blob, cb) {
+            var a = new FileReader();
+            a.readAsDataURL(blob);
+            a.onload = function (e){
+                cb(e.target.result);
+            };
+            a.onerror = function (e){
+                cb(null);
+            }
+        }
+
+        async function getBase64FromBlobUrl(blobUrl) {
+            let blob = getBlob(blobUrl);
+            if (!blob) return "";
+            return new Promise(resolve => {
+                blobToDataURL(blob, base64 => {
+                    resolve(base64);
+                });
+            });
+        }
+
         var rulerEle = document.createElement("span");
-        rulerEle.style.visibility = "hidden";
-        rulerEle.style.whiteSpace = "nowrap";
+        if (rulerEle.style) {
+            rulerEle.style.visibility = "hidden";
+            rulerEle.style.whiteSpace = "nowrap";
+        }
         function visualLength(str,size,family) {
+            if (!rulerEle.style) return 230;
             rulerEle.style.fontSize = size || "inherit";
             rulerEle.style.fontFamily = family || "inherit";
             rulerEle.innerText = str;
-            document.body.appendChild(rulerEle);
+            getBody(document).appendChild(rulerEle);
             let w = rulerEle.offsetWidth;
-            document.body.removeChild(rulerEle);
+            getBody(document).removeChild(rulerEle);
             return w;
         }
 
@@ -12212,10 +13627,10 @@ ImgOps | https://imgops.com/#b#`;
             var rect=target.getBoundingClientRect();
             var compStyle=unsafeWindow.getComputedStyle(target);
             var pFloat=parseFloat;
-            var top=rect.top + pFloat(compStyle.paddingTop) + pFloat(compStyle.borderTopWidth);
-            var right=rect.right - pFloat(compStyle.paddingRight) - pFloat(compStyle.borderRightWidth);
-            var bottom=rect.bottom - pFloat(compStyle.paddingBottom) - pFloat(compStyle.borderBottomWidth);
-            var left=rect.left + pFloat(compStyle.paddingLeft) + pFloat(compStyle.borderLeftWidth);
+            var top=rect.top + pFloat(compStyle.borderTopWidth);
+            var right=rect.right - pFloat(compStyle.borderRightWidth);
+            var bottom=rect.bottom - pFloat(compStyle.borderBottomWidth);
+            var left=rect.left + pFloat(compStyle.borderLeftWidth);
             return {
                 top:top,
                 right:right,
@@ -12238,7 +13653,7 @@ ImgOps | https://imgops.com/#b#`;
 
             //去除滚动条的窗口大小
             var de=document.documentElement;
-            var body=document.body;
+            var body=getBody(document);
             var backCompat=document.compatMode=='BackCompat';
             return {
                 h:backCompat? body.clientHeight : de.clientHeight,
@@ -12256,8 +13671,8 @@ ImgOps | https://imgops.com/#b#`;
                 };
             }
             return {
-                x:'scrollX' in window ? window.scrollX : ('pageXOffset' in window ? window.pageXOffset : document.documentElement.scrollLeft || document.body.scrollLeft),
-                y:'scrollY' in window ? window.scrollY : ('pageYOffset' in window ? window.pageYOffset :  document.documentElement.scrollTop || document.body.scrollTop),
+                x:'scrollX' in window ? window.scrollX : ('pageXOffset' in window ? window.pageXOffset : document.documentElement.scrollLeft || getBody(document).scrollLeft),
+                y:'scrollY' in window ? window.scrollY : ('pageYOffset' in window ? window.pageYOffset :  document.documentElement.scrollTop || getBody(document).scrollTop),
             };
         }
 
@@ -12550,6 +13965,7 @@ ImgOps | https://imgops.com/#b#`;
 
 
 
+            var errorList = {}, errorBlobList = {};
             var imgReady=function(img,opts){
 
                 if(/NodeList|HTMLCollection/.test(Object.prototype.toString.call(img))  || Array.isArray(img)){
@@ -12619,6 +14035,12 @@ ImgOps | https://imgops.com/#b#`;
                                     loadEnd.call(img,e);
                                 };
                             };
+                            iRReadyFn = iRReadyFn.filter(function(item) {
+                                return item !== readyHandler
+                            });
+                            isrcs = isrcs.filter(function(item) {
+                                return item !== src
+                            });
                         }break;
                         case 'ready':{
                             if(!ready || readyHandler.done)return;
@@ -12630,6 +14052,9 @@ ImgOps | https://imgops.com/#b#`;
                         }break;
                         case 'error':{
                             removeListener();
+                            iRReadyFn = iRReadyFn.filter(function(item) {
+                                return item !== readyHandler
+                            });
                             if(error){
                                 error.call(img,e);
                             };
@@ -12648,6 +14073,12 @@ ImgOps | https://imgops.com/#b#`;
                     img:img,
                     abort:function(){
                         if(!loadEndDone){
+                            iRReadyFn = iRReadyFn.filter(function(item) {
+                                return item !== readyHandler
+                            });
+                            isrcs = isrcs.filter(function(item) {
+                                return item !== src
+                            });
                             aborted=true;
                             removeListener();
                             img.src= prefs.icons.brokenImg_small;
@@ -12677,10 +14108,43 @@ ImgOps | https://imgops.com/#b#`;
 
 
                 function loadHandler(e){
+                    if(aborted)return;
                     go('load',e);
                 };
 
                 function errorHandler(e){
+                    if(aborted)return;
+
+                    if (!errorBlobList[img.src] && !/^blob:/.test(img.src)) {
+                        errorList[img.src]=true;
+                        let orgSrc = img.src;
+                        _GM_xmlhttpRequest({
+                            method: 'GET',
+                            url: img.src,
+                            responseType: 'blob',
+                            onload: function(response) {
+                                const blobUrl = URL.createObjectURL(response.response);
+                                const releaseBlob = () => URL.revokeObjectURL(blobUrl);
+                                window.addEventListener('beforeunload', releaseBlob);
+
+                                img.src = blobUrl;
+                                setTimeout(() => {
+                                    if (aborted) return;
+                                    if (typeof img.width == 'number' && img.width && img.height) {
+                                    } else {
+                                        errorBlobList[orgSrc] = true;
+                                    }
+                                }, 0);
+                            },
+                            onerror: function() {
+                                if (aborted) return;
+                                errorBlobList[orgSrc] = true;
+                                go('error',e);
+                            }
+                        });
+                        return;
+                    }
+
                     go('error',e);
                 };
 
@@ -12692,7 +14156,7 @@ ImgOps | https://imgops.com/#b#`;
                 //ready必须在load之前触发。
 
                 if(img.complete){//图片已经加载完成.
-                    if(typeof img.width=='number' && img.width && img.height){//图片
+                    if(/^data/.test(img.src) || (typeof img.width=='number' && img.width && img.height)){//图片
                         setTimeout(function(){
                             if(aborted)return;
                             go('load',{
@@ -12701,6 +14165,7 @@ ImgOps | https://imgops.com/#b#`;
                             });
                         },0);
                     }else{//这不是图片.opera会识别错误.
+                        errorList[img.src]=true;
                         setTimeout(function(){
                             if(aborted)return;
                             go('error',{
@@ -12731,6 +14196,12 @@ ImgOps | https://imgops.com/#b#`;
                         iRInterval=setInterval(checkReady,66);
                     };
                 };
+                if (errorList[img.src]) {
+                    go('error',{
+                        type:'error',
+                        target:img,
+                    });
+                }
 
                 return ret;
             };
@@ -12747,7 +14218,7 @@ ImgOps | https://imgops.com/#b#`;
                     ret='wheel';
                 }else if(eventSupported('mousewheel')){//opera,chrome
                     ret='mousewheel';
-                };
+                }
                 return ret;
             };
 
@@ -12796,7 +14267,7 @@ ImgOps | https://imgops.com/#b#`;
                     };
 
                     callback.call(this,ne? ne : e);
-                },useCapture || false);
+                },{ passive: false, capture: useCapture || false });
             };
         })();
 
@@ -12853,32 +14324,41 @@ ImgOps | https://imgops.com/#b#`;
                 this.gallery=container;
                 container.className='pv-gallery-container';
                 container.tabIndex=1;//为了获取焦点，来截获键盘事件
-                container.innerHTML=createHTML(
+                setHTML(container,
                     '<span class="pv-gallery-head">'+
                     '<span class="pv-gallery-head-float-left">'+
                     '<span title="'+i18n("picInfo")+'" class="pv-gallery-head-left-img-info">'+
                     '<span class="pv-gallery-head-left-img-info-resolution" title="'+i18n("resolution")+'">0 x 0</span>'+
+                    '<span class="pv-gallery-head-left-img-info-size" title="Size"></span>'+
                     '<span class="pv-gallery-head-left-img-info-count" title="'+i18n("picNum")+'">（1 / 1）</span>'+
                     '<span class="pv-gallery-head-left-img-info-scaling" title="'+i18n("scaleRatio")+'">（100%）</span>'+
                     '<span class="pv-gallery-vertical-align-helper"></span>'+
                     '<span class="pv-gallery-head-left-img-info-description" title="'+i18n("picNote")+'"></span>'+
-                    '<div class="pv-gallery-range-box"><input type="range" id="minsizeW" min="0" max="100" value="0" title="Width"> <span id="minsizeWSpan">0px</span> '+
-                    '<input type="range" id="minsizeH" min="0" max="100" value="0" title="Height"> <span id="minsizeHSpan">0px</span></div>'+
+                    '<div class="pv-gallery-range-box"><input type="range" id="minsizeW" min="0" max="100" value="0" title="Width" /> <span id="minsizeWSpan">0px</span> '+
+                    '<input type="range" id="minsizeH" min="0" max="100" value="0" title="Height" /> <span id="minsizeHSpan">0px</span>'+
+                    '<select id="pinSize">'+
+                    '<option value="" disabled selected>'+i18n("size")+'</option>'+
+                    '<option value="0">'+i18n("all")+'</option>'+
+                    '<option value="512x512">'+i18n("bigSize")+'</option>'+
+                    '<option value="0-256x0-256">'+i18n("iconSize")+'</option>'+
+                    '</select>'+
+                    '</div>'+
                     '<span class="pv-gallery-head-left-lock-icon" title="'+i18n("lockSizeTip")+'"></span>'+
+                    '<span class="pv-gallery-head-left-filter-icon" title="'+i18n("urlFilterTip")+'"></span>'+
                     '</span>'+
                     '</span>'+
 
                     '<span title="'+i18n("exitCollectionTip")+'" class="pv-gallery-head-command pv-gallery-head-command-exit-collection">'+
-                    '<span>'+i18n("exitCollection")+'</span>'+
+                    '<span class="pv-gallery-head-command"><span>'+i18n("exitCollection")+'</span></span>'+
                     '<span class="pv-gallery-vertical-align-helper"></span>'+
                     '</span>'+
 
                     '<span title="'+i18n("loadAllTip")+'" class="pv-gallery-head-command pv-gallery-head-command-nextPage">'+
-                    '<span>'+i18n("loadAll")+'</span>'+
+                    '<div class="pv-gallery-head-command"><span>'+i18n("loadAll")+'</span></div>'+
                     '<span class="pv-gallery-vertical-align-helper"></span>'+
                     '</span>'+
 
-                    '<span title="'+i18n("urlFilterTip")+'" class="pv-gallery-head-command pv-gallery-head-command-urlFilter">'+
+                    /*'<span title="'+i18n("urlFilterTip")+'" class="pv-gallery-head-command pv-gallery-head-command-urlFilter">'+
                     '<span>'+i18n("urlFilter")+'</span>'+
                     '<span class="pv-gallery-vertical-align-helper"></span>'+
                     '</span>'+
@@ -12886,7 +14366,7 @@ ImgOps | https://imgops.com/#b#`;
                     '<span title="'+i18n("fiddleTip")+'" class="pv-gallery-head-command pv-gallery-head-command-operate">'+
                     '<span>'+i18n("fiddle")+'</span>'+
                     '<span class="pv-gallery-vertical-align-helper"></span>'+
-                    '</span>'+
+                    '</span>'+*/
 
                     '<span class="pv-gallery-head-command-container">'+
                     '<span class="pv-gallery-head-command pv-gallery-head-command-collect">'+
@@ -12914,12 +14394,16 @@ ImgOps | https://imgops.com/#b#`;
                     '</span>'+
                     '<span class="pv-gallery-head-command-drop-list pv-gallery-head-command-drop-list-slide-show">'+
                     '<span class="pv-gallery-head-command-drop-list-item" title="'+i18n("slideGapTip")+'">'+
-                    '<input data-prefs="interval" step="1" min="1" type="number" value="5" />'+
+                    '<input class="pv-gallery-head-command-drop-list-slide-show-interval" data-prefs="interval" step="1" min="1" type="number" value="5" />'+
                     '<span>'+i18n("slideGap")+'</span>'+
                     '</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item"  title="'+i18n("slideBackTip")+'">'+
                     '<input id="pv-gallery-head-command-drop-list-item-slide-show-backward" data-prefs="backward" type="checkbox" />'+
                     '<label for="pv-gallery-head-command-drop-list-item-slide-show-backward">'+i18n("slideBack")+'　　　</label>'+
+                    '</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item">'+
+                    '<input id="pv-gallery-head-command-drop-list-item-slide-show-random" data-prefs="random" type="checkbox" />'+
+                    '<label for="pv-gallery-head-command-drop-list-item-slide-show-random">'+i18n("slideRandom")+'　　　</label>'+
                     '</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item"  title="'+i18n("slideWaitTip")+'">'+
                     '<input id="pv-gallery-head-command-drop-list-item-slide-show-wait" data-prefs="wait" type="checkbox" checked="checked" />'+
@@ -12947,17 +14431,32 @@ ImgOps | https://imgops.com/#b#`;
                     '<span class="pv-gallery-vertical-align-helper"></span>'+
                     '</span>'+
                     '<span class="pv-gallery-head-command-drop-list pv-gallery-head-command-drop-list-others">'+
-                    '<span class="pv-gallery-head-command-drop-list-item" data-command="psImage" title="'+i18n("onlineEditTip",prefs.gallery.editSite)+'">'+i18n("onlineEdit")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="enterCollection" title="'+i18n("viewCollectionTip")+'">'+i18n("viewCollection")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="psImage" title="'+i18n("onlineEditTip"," " + prefs.gallery.editSite + " ")+'">'+i18n("onlineEdit")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="downloadImage" title="'+i18n("downloadImageTip")+'">'+i18n("downloadImage")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="postImagesToAria2" title="'+i18n("post2Aria2")+'">'+i18n("post2Aria2")+'</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item" data-command="exportImages" title="'+i18n("exportImagesTip")+'">'+i18n("exportImages")+'</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item" data-command="copyImages" title="'+i18n("copyImagesUrlTip")+'">'+i18n("copyImagesUrl")+'</span>'+
-                    '<span class="pv-gallery-head-command-drop-list-item" data-command="downloadImage" title="'+i18n("downloadImageTip")+'">'+i18n("downloadImage")+'</span>'+
-                    '<span class="pv-gallery-head-command-drop-list-item" data-command="openInNewWindow" title="'+i18n("openInNewWindowTip")+'">'+i18n("openInNewWindow")+'</span>'+
-                    '<span class="pv-gallery-head-command-drop-list-item" data-command="enterCollection" title="'+i18n("viewCollectionTip")+'">'+i18n("viewCollection")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="cookie">Cookie</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item" data-command="scrollIntoView" title="'+i18n("findInPageTip")+'">'+i18n("findInPage")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="openInNewWindow" title="'+i18n("openInNewWindowTip")+'">'+i18n("openInNewWindow")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item">'+
+                    i18n("rotate")+' <select id="galleryRotate">'+
+                    '<option value="0">0°</option>'+
+                    '<option value="90">90°</option>'+
+                    '<option value="180">180°</option>'+
+                    '<option value="270">270°</option>'+
+                    '</select>'+
+                    '</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item" title="'+i18n("autoRefreshTip")+'">'+
                     '<label data-command="scrollToEndAndReload">'+i18n("autoRefresh")+'</label>'+
                     '<input type="checkbox"  data-command="scrollToEndAndReload"/>'+
                     '</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="urlFilter" title="'+i18n("urlFilterTip")+'">'+i18n("urlFilter")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="addImageUrls" title="'+i18n("addImageUrlsTips")+'">'+i18n("addImageUrls")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="openImages" title="'+i18n("openImagesTips")+'">'+i18n("openImages")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="operate" title="'+i18n("fiddleTip")+'">'+i18n("fiddle")+'</span>'+
+                    '<span class="pv-gallery-head-command-drop-list-item" data-command="viewmore">'+i18n("viewmore")+'</span>'+
                     '<span id="pv-gallery-fullscreenbtn" class="pv-gallery-head-command-drop-list-item" data-command="fullScreen">'+i18n("enterFullsc")+'</span>'+
                     '<span class="pv-gallery-head-command-drop-list-item" data-command="openPrefs">'+i18n("openConfig")+'</span>'+
                     '</span>'+
@@ -13050,8 +14549,40 @@ ImgOps | https://imgops.com/#b#`;
                     '</span>'+
                     '<span class="pv-gallery-maximize-scroll"><span class="pv-gallery-maximize-container"></span></span>'+
                     '<span class="pv-gallery-tipsWords"></span>'+
+                    '<span class="pv-gallery-urls-textarea"><textarea></textarea><span class="pv-gallery-urls-textarea-close"></span><span class="pv-gallery-urls-textarea-download">'+prefs.icons.downloadSvgBtn+'</span></span>'+
                     '</span>');
-                document.body.appendChild(container);
+                document.documentElement.appendChild(container);
+
+                let bricksInstance = Bricks({
+                    container: ".pv-gallery-maximize-container",
+                    packed: "data-packed",
+                    sizes: [{
+                        columns: 2,
+                        gutter: 10
+                    }, {
+                        mq: "600px",
+                        columns: 3,
+                        gutter: 10
+                    }, {
+                        mq: "800px",
+                        columns: 4,
+                        gutter: 10
+                    }, {
+                        mq: "1000px",
+                        columns: 5,
+                        gutter: 10
+                    }, {
+                        mq: "1130px",
+                        columns: 6,
+                        gutter: 12
+                    }]
+                });
+                this.bricksInstance = bricksInstance;
+                unsafeWindow.bricksInstance = this.bricksInstance;
+
+                this.hideScrollStyle = document.createElement("style");
+                this.hideScrollStyle.textContent = "html {-ms-overflow-style: none; scrollbar-width: none;}html::-webkit-scrollbar { width: 0 !important; height: 0 !important; }";
+                this.hideScrollStyle.type = 'text/css';
 
                 var self=this;
 
@@ -13059,44 +14590,104 @@ ImgOps | https://imgops.com/#b#`;
                 this.hideBodyStyle=hideBodyStyle;
                 hideBodyStyle.textContent=`body>*:not([class^="pv-"]) img,body>img{display:none}`;
 
-                container.querySelector("#minsizeW").oninput=function(){self.changeMinView();};
-                container.querySelector("#minsizeH").oninput=function(){self.changeMinView();};
-                container.querySelector("#minsizeWSpan").onclick=function(){
-                    var minsizeW=window.prompt("Width:",this.value);
-                    if(!minsizeW)return;
-                    container.querySelector("#minsizeW").value=minsizeW;
+                var sizeInputH = container.querySelector("#minsizeH");
+                var sizeInputW = container.querySelector("#minsizeW");
+                this.sizeInputH = sizeInputH;
+                this.sizeInputW = sizeInputW;
+                sizeInputW.oninput = function(){self.changeMinView();};
+                sizeInputH.oninput = function(){self.changeMinView();};
+                container.querySelector("#minsizeWSpan").onclick = function(){
+                    var minsizeW = window.prompt("Width:",sizeInputW.value);
+                    if (!minsizeW) return;
+                    sizeInputW.value = minsizeW;
                     self.changeMinView();
                 };
-                container.querySelector("#minsizeHSpan").onclick=function(){
-                    var minsizeH=window.prompt("Height:",this.value);
-                    if(!minsizeH)return;
-                    container.querySelector("#minsizeH").value=minsizeH;
+                container.querySelector("#minsizeHSpan").onclick = function(){
+                    var minsizeH = window.prompt("Height:",sizeInputH.value);
+                    if (!minsizeH) return;
+                    sizeInputH.value = minsizeH;
                     self.changeMinView();
                 };
-                container.querySelector(".pv-gallery-head-left-lock-icon").onclick=function(){
-                    if(self.lockMaxSize){
-                        self.lockMaxSize=null;
+                var pinSize = container.querySelector("#pinSize");
+                pinSize.addEventListener('change', function(e) {
+                    let arr = e.target.value.split("x");
+                    if (arr.length !== 2) {
+                        self.lockMaxSize = null;
+                        sizeInputH.value = 0;
+                        sizeInputW.value = 0;
                         self.changeMinView();
-                        this.style.filter="";
-                        this.title=i18n("lockSizeTip");
-                    }else{
-                        var maxsizeW=window.prompt("Width:");
-                        if(!maxsizeW)return;
-                        var maxsizeH=window.prompt("Height:");
-                        if(!maxsizeH)return;
-                        self.lockMaxSize={w:maxsizeW,h:maxsizeH};
-                        self.changeMinView();
-                        this.style.filter="brightness(5)";
-                        this.title=maxsizeW+" x "+maxsizeH;
+                        headMaxLock.style.filter = "";
+                        headMaxLock.title = i18n("lockSizeTip");
+                        return;
                     }
+                    let wArr = arr[0].split("-");
+                    let hArr = arr[1].split("-");
+                    let minW = parseInt(wArr[0]);
+                    let maxW = parseInt(wArr[1] || 0);
+                    let minH = parseInt(hArr[0]);
+                    let maxH = parseInt(hArr[1] || 0);
+                    sizeInputH.value = minH;
+                    sizeInputW.value = minW;
+                    if (maxW && maxH) {
+                        self.lockMaxSize = {w: maxW, h: maxH};
+                        headMaxLock.style.filter = "brightness(5)";
+                        headMaxLock.title = maxW + " x " + maxH;
+                    } else {
+                        self.lockMaxSize = null;
+                        headMaxLock.style.filter = "";
+                        headMaxLock.title = i18n("lockSizeTip");
+                    }
+                    self.changeMinView();
+                });
+                this.pinSize = pinSize;
+                this.sizeMap = {};
+                var headMaxLock = container.querySelector(".pv-gallery-head-left-lock-icon");
+                headMaxLock.onclick = function() {
+                    if (self.lockMaxSize) {
+                        self.lockMaxSize = null;
+                        self.changeMinView();
+                        headMaxLock.style.filter = "";
+                        headMaxLock.title = i18n("lockSizeTip");
+                    } else {
+                        var maxsizeW, maxsizeH;
+                        maxsizeW = window.prompt("Max Width:", sizeInputW.max);
+                        if(maxsizeW) {
+                            maxsizeH = window.prompt("Max Height:", sizeInputH.max);
+                        }
+                        if (maxsizeH) {
+                            self.lockMaxSize={w:maxsizeW,h:maxsizeH};
+                            self.changeMinView();
+                            headMaxLock.style.filter="brightness(5)";
+                            headMaxLock.title=maxsizeW+" x "+maxsizeH;
+                        }
+                    }
+                    if (self.lockMaxSize) {
+                        storage.setListItem("maxSize", location.hostname, self.lockMaxSize);
+                        self.curDefaultSize = {h: sizeInputH.value, w: sizeInputW.value};
+                    } else {
+                        storage.setListItem("maxSize", location.hostname, "");
+                        self.curDefaultSize = "";
+                    }
+                    storage.setListItem("minSize", location.hostname, self.curDefaultSize);
                 };
 
                 var maximizeTrigger=document.createElement('span');
                 this.maximizeTrigger=maximizeTrigger;
-                maximizeTrigger.innerHTML=createHTML('-'+i18n("returnToGallery")+'-<span class="pv-gallery-maximize-trigger-close" title="'+i18n("closeGallery")+'"></span>');
+                setHTML(maximizeTrigger, '-'+i18n("returnToGallery")+'-<span class="pv-gallery-maximize-trigger-close" title="'+i18n("closeGallery")+'"></span>');
                 maximizeTrigger.className='pv-gallery-maximize-trigger';
 
-                document.body.appendChild(maximizeTrigger);
+                getBody(document).appendChild(maximizeTrigger);
+
+                container.querySelector("#galleryRotate").addEventListener('focus',function(e) {
+                    eleMaps['head-command-drop-list-others'].classList.add("focus");
+                });
+                container.querySelector("#galleryRotate").addEventListener('blur',function(e){
+                    eleMaps['head-command-drop-list-others'].classList.remove("focus");
+                });
+                container.querySelector("#galleryRotate").addEventListener('change',function(e) {
+                    self.galleryRotate = e.target.value;
+                    self.fitToScreen();
+                });
 
 
                 var validPos=['top','right','bottom','left'];
@@ -13125,23 +14716,24 @@ ImgOps | https://imgops.com/#b#`;
                     'head-left-img-info',
                     'head-left-img-info-description',
                     'head-left-img-info-resolution',
+                    'head-left-img-info-size',
                     'head-left-img-info-count',
                     'head-left-img-info-scaling',
 
                     'head-command-close',
                     'head-command-nextPage',
-                    'head-command-operate',
-                    'head-command-urlFilter',
                     'head-command-slide-show',
                     'head-command-slide-show-button-inner',
                     'head-command-slide-show-countdown',
                     'head-command-collect',
                     'head-command-exit-collection',
+                    'head-command-urlFilter',
 
                     'head-command-drop-list-category',
                     'head-command-drop-list-others',
                     'head-command-drop-list-share',
                     'head-command-drop-list-slide-show',
+                    'head-command-drop-list-slide-show-interval',
                     'head-command-drop-list-collect',
                     'head-command-drop-list-search',
 
@@ -13312,17 +14904,18 @@ ImgOps | https://imgops.com/#b#`;
                         '<label for="pv-gallery-head-command-drop-list-item-category-'+i+'">'+imgStatistics_i.name+'</label>'+
                         '</span>';
                 };
-                eleMaps['head-command-drop-list-category'].innerHTML=createHTML(typeMark);
+                setHTML(eleMaps['head-command-drop-list-category'], typeMark);
 
 
                 //收藏相关
                 var collection={
                     getMatched:function(){
-                        return (this.all || this.get())._find(function(value,index){
-                            if(value.src==self.src){
-                                return true;
-                            };
-                        });
+                        let all=this.all || this.get();
+                        for(let i=0;i<all.length;i++){
+                            let v=all[i];
+                            if(v.src==self.src) return [v, i];
+                        }
+                        return null;
                     },
                     check:function(){
                         //从缓存数据中检查。
@@ -13417,7 +15010,7 @@ ImgOps | https://imgops.com/#b#`;
                                 '<span class="pv-gallery-sidebar-thumb-loading" title="'+i18n("loading")+'......"></span>'+
                                 '</span>';
                         };
-                        container.innerHTML=createHTML(spanMark);
+                        setHTML(container, spanMark);
                         eleMaps['sidebar-thumbnails-container'].appendChild(container);
 
 
@@ -13464,15 +15057,31 @@ ImgOps | https://imgops.com/#b#`;
                         collection.save();
                     },500);
                 },true);
+                eleMaps['head-command-drop-list-collect'].addEventListener('keydown',function(e){
+                    e.stopPropagation();
+                },true);
+                let urlsTextareaCon = container.querySelector('.pv-gallery-urls-textarea');
+                this.urlsTextareaCon = urlsTextareaCon;
+                this.urlsTextarea = urlsTextareaCon.querySelector('textarea');
+                container.querySelector('.pv-gallery-urls-textarea-close').addEventListener('click', function(e){
+                    urlsTextareaCon.style.display = "";
+                }, true);
+                container.querySelector('.pv-gallery-urls-textarea-download').addEventListener('click', function(e){
+                    if (!self.urlsTextarea.value) return;
+                    let blob = new Blob([self.urlsTextarea.value], { type: "text/plain" });
+                    saveAs(blob, (document.title || "PicviewerCEPlus") + ".txt");
+                }, true);
 
 
+                let defaultSlideShowInterval = storage.getItem('slideShowInterval') || 5000;
                 var slideShow={
                     opts:{
-                        interval:5000,
+                        interval:defaultSlideShowInterval,
                         wait:true,
                         backward:false,
                         skipErrorImg:true,
                         run:false,
+                        random:false
                     },
                     //timing:
                     //select(选中下一个图片后（缩略图栏选中了），还没开始读取大图（一般选中后，延时200ms开始读取大图）),
@@ -13513,7 +15122,7 @@ ImgOps | https://imgops.com/#b#`;
 
                     },
                     getEle:function(){
-                        return self.getThumSpan(this.opts.backward)
+                        return self.getThumSpan(this.opts.backward, null, true, this.opts.random);
                     },
                     go:function(){
                         this.stop();//停止上次的。
@@ -13529,6 +15138,11 @@ ImgOps | https://imgops.com/#b#`;
                         this.countdownTimer=setInterval(function(){
                             _self.setCountdown(interval - (Date.now()-startTime));
                         },100);
+
+                        if (interval && interval !== defaultSlideShowInterval) {
+                            defaultSlideShowInterval = interval;
+                            storage.setItem('slideShowInterval', interval);
+                        }
                     },
                     stop:function(){
                         this.setCountdown(this.opts.interval);
@@ -13552,8 +15166,46 @@ ImgOps | https://imgops.com/#b#`;
                     },
                 };
 
-                slideShow.setCountdown(slideShow.opts.interval);;
+                slideShow.setCountdown(slideShow.opts.interval);
                 this.slideShow=slideShow;
+                eleMaps['head-command-drop-list-slide-show-interval'].value = parseInt(slideShow.opts.interval / 1000) || 5;
+
+                let filterIcon = container.querySelector(".pv-gallery-head-left-filter-icon");
+                function filterUrl() {
+                    let filterStr = prompt(i18n("urlFilterTip"), self.urlFilter || location.hostname) || "";
+                    if (filterStr != self.urlFilter) {
+                        self.urlFilter = filterStr;
+                        storage.setListItem("urlFilter", location.hostname, filterStr);
+                        if (self.urlFilter) {
+                            filterIcon.title = "Filter: " + self.urlFilter;
+                            filterIcon.style.filter = "brightness(5)";
+                        } else {
+                            filterIcon.title = i18n("urlFilterTip");
+                            filterIcon.style.filter = "";
+                        }
+                        self.urlFilterReg = null;
+                        self.changeMinView();
+                    }
+                }
+                filterIcon.onclick = function() {
+                    filterUrl();
+                };
+
+                this.urlFilter = "";
+                this.lockMaxSize = false;
+                var urlFilter = storage.getListItem("urlFilter", location.hostname) || false;
+                var lockMaxSize = storage.getListItem("maxSize", location.hostname) || false;
+                if (urlFilter) {
+                    self.urlFilter = urlFilter;
+                    filterIcon.title = self.urlFilter;
+                    filterIcon.style.filter = "brightness(5)";
+                }
+                if (lockMaxSize) {
+                    self.lockMaxSize=lockMaxSize;
+                    headMaxLock.style.filter="brightness(5)";
+                    headMaxLock.title=lockMaxSize.w+" x "+lockMaxSize.h;
+                }
+                self.curDefaultSize = storage.getListItem("minSize", location.hostname) || false;
 
                 //幻灯片播放下拉列表change事件的处理
                 eleMaps['head-command-drop-list-slide-show'].addEventListener('change',function(e){
@@ -13584,30 +15236,130 @@ ImgOps | https://imgops.com/#b#`;
                     self.switchThumbVisible();//切换图片类别显隐;
                 },true);
 
+                let scrollEndAndLoad = storage.getListItem("scrollEndAndLoad", location.hostname);
+                if (scrollEndAndLoad === true) {
+                    prefs.gallery.scrollEndAndLoad = true;
+                } else if (scrollEndAndLoad === false) {
+                    prefs.gallery.scrollEndAndLoad = false;
+                }
 
-                var srcSplit,downloading=false;
+                eleMaps['head-command-drop-list-others'].querySelector('input[data-command="scrollToEndAndReload"]').checked = prefs.gallery.scrollEndAndLoad;
+                let downloading=false, saveParams;
+                async function getSaveParams() {
+                    let nodes = self.eleMaps['sidebar-thumbnails-container'].querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]:not(.ignore)');
+                    let saveParams = [];
+                    for (const node of nodes) {
+                        if (unsafeWindow.getComputedStyle(node).display !== "none") {
+                            let xhr = dataset(node, 'xhr') !== 'stop' && self.getPropBySpanMark(node, "xhr");
+                            if (xhr) {
+                                self.showTips("Sending request...", 3000);
+                                await new Promise(resolve => {
+                                    setTimeout(() => {
+                                        let xhrError = function() {
+                                            dataset(node, 'xhr', 'stop');
+                                            dataset(node, 'src', dataset(node, 'thumbSrc'));
+                                            resolve();
+                                        };
+                                        xhrLoad.load({
+                                            url: node.dataset.src,
+                                            xhr: xhr,
+                                            cb: function(imgSrc, imgSrcs, caption) {
+                                                if (imgSrc) {
+                                                    dataset(node, 'src', imgSrc);
+                                                    dataset(node, 'xhr', 'stop');
+                                                    if (caption) dataset(node, 'description', caption);
+                                                    resolve();
+                                                } else {
+                                                    xhrError();
+                                                }
+                                            },
+                                            onerror: xhrError
+                                        });
+                                    }, prefs.gallery.downloadGap || 0);
+                                });
+                            }
+
+
+                            let title = node.title.indexOf('\n') !== -1 ? node.title.split('\n')[0] : node.title;
+                            title = title.indexOf('http') === 0 || title.indexOf('data') === 0 ? '' : title;
+                            const data = self.getPropBySpanMark(node);
+                            const srcs = new Set([node.dataset.src].concat(node.dataset.srcs ? node.dataset.srcs.split(",") : []));
+                            srcs.forEach(src => {
+                                const picName = String(saveParams.length + 1).padStart(3, '0') + '-' + getSaveName(src, title, prefs.saveName, data);
+                                saveParams.push([src, picName]);
+                            });
+                        }
+                    }
+                    return saveParams;
+                }
+                self.openImages = (e) => {
+                    let fileInput = document.createElement("input");
+                    fileInput.type = "file";
+                    fileInput.accept = "image/*,video/*,audio/*";
+                    fileInput.setAttribute("multiple", "");
+                    if (e && (e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)) {
+                        fileInput.setAttribute("directory", "");
+                        fileInput.setAttribute("webkitdirectory", "");
+                    }
+                    fileInput.addEventListener("change", e => {
+                        const files = e.target.files;
+                        if (files.length) {
+                            for (var i = 0; i < files.length; i++) {
+                                let file = files.item(i);
+                                file = files[i];
+                                let src = URL.createObjectURL(file);
+                                let media;
+                                if (file.type.indexOf("image") === 0) {
+                                    media = document.createElement('img');
+                                } else if (file.type.indexOf("audio") === 0) {
+                                    media = document.createElement('audio');
+                                    src = "audio:" + src;
+                                } else if (file.type.indexOf("video") === 0) {
+                                    media = createVideo();
+                                    src = "video:" + src;
+                                } else continue;
+                                media.title = file.name;
+                                var result = {
+                                    src: src,
+                                    type: 'force',
+                                    imgSrc: src,
+                                    noActual:true,
+                                    description: file.name,
+                                    img: media
+                                };
+                                self.data.push(result);
+                                self._appendThumbSpans([result]);
+                            }
+                            self.loadThumb();
+                            self.changeSizeInputReset();
+                        }
+                    }, false);
+                    fileInput.click();
+                };
                 //命令下拉列表的点击处理
-                eleMaps['head-command-drop-list-others'].addEventListener('click',function(e){
+                eleMaps['head-command-drop-list-others'].addEventListener('click',async function(e){
                     if(e.button!=0)return;//左键
-                    var target=e.target;
-                    var command=dataset(target,'command');
+                    let target=e.target;
+                    let command=dataset(target,'command');
                     if(!command)return;
                     switch(command){
                         case 'openInNewWindow':{
-                            window.open(self.src,'_blank');
+                            _GM_openInTab(self.src, {active:true});
+                            //window.open(self.src,'_blank');
                         }break;
                         case 'psImage':{
-                            //window.open((prefs.gallery.editSite=='Pixlr'?'https://pixlr.com/editor/?image=':'https://www.toolpic.com/apieditor.html?image=')+self.src,'_blank');
-                            window.open('https://www.lunapic.com/editor/index.php?action=url&url='+self.src,'_blank');
+                            let editFunc=editSitesFunc[prefs.gallery.editSite];
+                            if(!editFunc)editFunc=editSitesFunc[Object.keys(editSitesFunc)[0]];
+                            if(editFunc)editFunc(self.src, true);
                         }break;
                         case 'scrollIntoView':{
                             if(collection.mMode){
                                 self.showTips(i18n("inCollection"));
                                 return;
                             };
-                            var relatedThumb=self.relatedThumb;
-                            var index=arrayFn.indexOf.call(self.imgSpans,relatedThumb);
-                            var targetImg=self.data[index].img;
+                            let relatedThumb=self.relatedThumb;
+                            let index=arrayFn.indexOf.call(self.imgSpans,relatedThumb);
+                            let targetImg=self.data[index].img;
 
                             if(targetImg){
                                 if(!document.documentElement.contains(targetImg) || unsafeWindow.getComputedStyle(targetImg).display=='none'){//图片不存在文档中，或者隐藏了。
@@ -13646,40 +15398,58 @@ ImgOps | https://imgops.com/#b#`;
                         case 'exportImages':
                             self.exportImages();
                             break;
+                        case 'postImagesToAria2':
+                            if (!prefs.gallery.aria2Host) {
+                                self.showTips("Configure aria2 first!", 1000);
+                                return;
+                            }
+                            saveParams = await getSaveParams();
+                            [].forEach.call(saveParams, function(param){
+                                _GM_xmlhttpRequest({
+                                    method: 'POST',
+                                    url: prefs.gallery.aria2Host + "/jsonrpc",
+                                    data: JSON.stringify({
+                                        params: [
+                                            "token:" + (prefs.gallery.aria2Token || ""),
+                                            [param[0]],
+                                            {"out": param[1]}
+                                        ],
+                                        jsonrpc: "2.0",
+                                        method: "aria2.addUri",
+                                        id: Math.random()
+                                    }),
+                                    onload: function(d) {
+                                    },
+                                    onerror: function(e) {
+                                        self.showTips("Error! Check aria2 setting!", 1000);
+                                    }
+                                });
+                            });
+                            self.showTips("Completed!", 1000);
+                            break;
                         case 'downloadImage':
                             if(downloading)break;
                             downloading=true;
-                            var nodes = document.querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]');
-                            var saveParams = [],saveIndex=0;
-                            [].forEach.call(nodes, function(node){
-                                if(unsafeWindow.getComputedStyle(node).display!="none"){
-                                    saveIndex++;
-                                    srcSplit=node.dataset.src.replace(/[\?#].*/,"").split("/");
-                                    srcSplit=srcSplit[srcSplit.length-1];
-                                    if(srcSplit.length>30 && (srcSplit.indexOf(".")==-1 || /[&\?=,]/i.test(srcSplit))){
-                                        srcSplit="";
-                                    }
-                                    if(srcSplit.length>50)srcSplit=srcSplit.substring(0,50);
-                                    var picName=document.title + "-" + (saveIndex<10?"00"+saveIndex:(saveIndex<100?"0"+saveIndex:saveIndex)) + (node.title?"-" + node.title:"") + "-" + srcSplit,hostArr=location.host.split(".");
-                                    var host=hostArr[hostArr.length-2];
-                                    saveParams.push([node.dataset.src, picName]);
-                                    //saveAs(node.dataset.src, location.host+"-"+srcSplit[srcSplit.length-1]);
-                                }
-                            });
+                            saveParams = await getSaveParams();
                             self.batchDownload(saveParams, ()=>{
                                 downloading=false;
+                                self.showTips("Completed!", 1000);
                             });
                             break;
                         case 'copyImages':
                             self.copyImages(true);
                             break;
+                        case 'cookie':
+                            cookie = prompt("Set Cookie", cookie || "");
+                            break;
                         case 'scrollToEndAndReload':
                             var checkbox = target.parentNode.querySelector("input");
-                            if(target.nodeName=="LABEL"){
+                            if(target.nodeName.toUpperCase()=="LABEL"){
                                 checkbox.checked = !checkbox.checked;
                             }
 
                             prefs.gallery.scrollEndAndLoad = checkbox.checked;
+                            storage.setListItem("scrollEndAndLoad", location.hostname, checkbox.checked);
                             break;
                         case 'fullScreen':
                             if (target.classList.contains('fullscreenbtn')) {
@@ -13693,18 +15463,69 @@ ImgOps | https://imgops.com/#b#`;
                             target.classList.toggle('fullscreenbtn');
                             target.textContent = i18n("exitFullsc");
                             target.classList.add('fullscreenbtn');
+                            var sidebarContainer = self.eleMaps['sidebar-container'],
+                                isHidden = sidebarContainer.style.visibility == 'hidden';
+                            if (!isHidden) self.showHideBottom();
                             break;
                         case 'openPrefs':
                             openPrefs();
                             break;
-                        case 'enterCollection':{
+                        case 'viewmore':
+                            self.maximizeSidebar();
+                            break;
+                        case 'openImages':
+                            self.openImages(e);
+                            break;
+                        case 'addImageUrls':
+                            let urls = window.prompt(i18n('addImageUrls') + ": White space to split multi-image, '[01-09]' to generate nine urls from 01 to 09, '$http://xxx' to fetch images from page","https://xxx.xxx/pic-[20-99].jpg https://xxx.xxx/pic-[01-10].png");
+                            if (!urls) return;
+                            self.addImageUrls(urls);
+                            break;
+                        case 'operate':
+                            if (self.img === null || self.img.style.display === 'none') return;
+                            let fiddleWindow;
+                            if (/img/i.test(self.img.nodeName)) {
+                                imgReady(self.src, {
+                                    ready:function() {
+                                        self.img.style.display = "none";
+                                        fiddleWindow = new ImgWindowC(this, {...self.getPropBySpanMark(self.selected), src: this.src});
+                                        let targetSrc = self.src;
+                                        fiddleWindow.imgWindow.addEventListener("pv-removeImgWindow", e => {
+                                            if (self.img.style.display === "none") {
+                                                self.img.style.display = "";
+                                            }
+                                        });
+                                    }
+                                });
+                            } else {
+                                let target = self.img;
+                                let classNameBak = target.className;
+                                fiddleWindow = new ImgWindowC(target, {...self.getPropBySpanMark(self.selected), src: target.src});
+                                self.img = null;
+                                let targetSrc = self.src;
+                                fiddleWindow.imgWindow.addEventListener("pv-removeImgWindow", e => {
+                                    if (self.img === null) {
+                                        target.style.width = "";
+                                        target.style.height = "";
+                                        target.style.opacity = 1;
+                                        eleMaps['img-parent'].appendChild(target);
+                                        self.img = target;
+                                        self.img.className = classNameBak;
+                                    }
+                                });
+                            }
+                            break;
+                        case 'urlFilter':
+                            filterUrl();
+                            break;
+                        case 'enterCollection':
                             //进入管理模式
                             collection.enter();
-                        }break;
-                        case 'exitCollection':{
+                            break;
+                        case 'exitCollection':
                             //退出管理模式
                             collection.exit();
-                        }break;
+                            break;
                     };
                 },true);
 
@@ -13718,7 +15539,7 @@ ImgOps | https://imgops.com/#b#`;
                         var btn = document.getElementById("pv-gallery-fullscreenbtn");
                         if (btn) {
                             btn.textContent = i18n("enterFullsc");
-                            btn.removeClass('fullscreenbtn');
+                            btn.classList.remove('fullscreenbtn');
                         }
                     }
                 }
@@ -13742,7 +15563,7 @@ ImgOps | https://imgops.com/#b#`;
                         padding-left:24px;">'+shareItem.name+'</span>');
                 };
 
-                eleMaps['head-command-drop-list-share'].innerHTML=createHTML(shareMark);
+                setHTML(eleMaps['head-command-drop-list-share'], shareMark);
 
                 //分享下拉列表的点击处理
                 eleMaps['head-command-drop-list-share'].addEventListener('click',function(e){
@@ -13781,7 +15602,7 @@ ImgOps | https://imgops.com/#b#`;
                     if(ruleArr.length==2){
                         var item=document.createElement('span');
                         item.className="pv-gallery-head-command-drop-list-item";
-                        item.innerHTML=createHTML(ruleArr[0]);
+                        setHTML(item, ruleArr[0]);
                         item.addEventListener('click',function(e){
                             let url=encodeURIComponent(self.src);
                             let urlb=self.src.replace(/https?:\/\//i,"");
@@ -13796,11 +15617,12 @@ ImgOps | https://imgops.com/#b#`;
                 });
 
 
-
-                var loadThumbsTimer;
+                let loadingThumbs = false;
                 eleMaps['sidebar-thumbnails-container'].addEventListener('scroll',function(e){//发生scroll事件时加载缩略图
-                    clearTimeout(loadThumbsTimer);//加个延时，在连续触发的时候缓一缓。
-                    loadThumbsTimer=setTimeout(function(){
+                    if (loadingThumbs) return;
+                    loadingThumbs = true;
+                    setTimeout(function(){
+                        loadingThumbs = false;
                         self.loadThumb();
                     },200);
                 },false);
@@ -13818,11 +15640,12 @@ ImgOps | https://imgops.com/#b#`;
                     }
                 }
                 addWheelEvent(eleMaps['body'],function(e){//wheel事件
-                    if(e.deltaZ!=0)return;//z轴
+                    if(e.deltaZ!=0 || e.target.nodeName=="TEXTAREA")return;//z轴
                     if(eleMaps['sidebar-toggle'].style.visibility == 'hidden')return;
                     var target=e.target;
                     //e.preventDefault();
                     if(eleMaps['sidebar-container'].contains(target)){//缩略图区滚动滚轮翻图片
+                        if (e.deltaX === 0 && e.deltaY === 0) return;
                         let distance=self.thumbSpanOuterSize;
 
                         if(e.deltaY<0 || e.deltaX<0){//向上滚
@@ -13834,8 +15657,8 @@ ImgOps | https://imgops.com/#b#`;
                         if(e.deltaY!=0){//y轴
                             if(self.img && self.img.classList.contains('pv-gallery-img_zoom-out')){//图片可以缩小时，滚动图片，否则切换图片。
                                 if(e.deltaY < 0){
-                                    distance=-distance;
-                                };
+                                    distance=-Math.max(distance, -e.deltaY);
+                                }else distance=Math.max(distance, e.deltaY);
                                 if(eleMaps['img-scrollbar-h'].contains(target)){//如果在横向滚动条上。
                                     imgScrollbarH.scrollBy(distance);
                                 }else{
@@ -13848,12 +15671,26 @@ ImgOps | https://imgops.com/#b#`;
                             };
                         }else{//x轴
                             if(e.deltaX < 0){
-                                distance=-distance;
-                            };
+                                distance=-Math.max(distance, -e.deltaX);
+                            }else distance=Math.max(distance, e.deltaX);
                             imgScrollbarH.scrollBy(distance);
                         }
                     }
                 },true);
+                var headScrollStyle = document.createElement("style");
+                headScrollStyle.type = 'text/css';
+                document.head.appendChild(headScrollStyle);
+                let galleryHead = eleMaps['head'];
+                addWheelEvent(galleryHead, function(e) {
+                    galleryHead.scrollLeft += e.deltaY;
+                    headScrollStyle.textContent = '';
+                    let scrollLeft = galleryHead.scrollLeft;
+                    if (!scrollLeft) return;
+                    headScrollStyle.textContent = `.pv-gallery-head-command-drop-list{margin-left:${-scrollLeft}px}`;
+                    if (!headScrollStyle.parentNode) {
+                        document.head.appendChild(headScrollStyle);
+                    }
+                }, true);
 
 
                 //focus,blur;
@@ -13910,10 +15747,10 @@ ImgOps | https://imgops.com/#b#`;
                     lastX=e.changedTouches[0].clientX;
                     lastY=e.changedTouches[0].clientY;
                     self.eleMaps['img-content'].addEventListener('touchmove',tracer);
-                });
+                },{ passive: false, capture: false });
                 self.eleMaps['img-content'].addEventListener('touchend',function(e){
                     self.eleMaps['img-content'].removeEventListener('touchmove',tracer);
-                });
+                },{ passive: false, capture: false });
 
                 //上下左右切换图片,空格键模拟滚动一页
 
@@ -13921,6 +15758,7 @@ ImgOps | https://imgops.com/#b#`;
                 var keyDown;
 
                 container.addEventListener('keydown',function(e){
+                    if(prefs.gallery.disableArrow)return;
                     var keyCode=e.keyCode;
                     var index=validKeyCode.indexOf(keyCode);
                     if(index==-1)return;
@@ -13929,6 +15767,7 @@ ImgOps | https://imgops.com/#b#`;
 
                     if(!container.contains(target))return;//触发焦点不再gallery里面。
                     e.preventDefault();
+                    e.stopPropagation();
 
                     if(keyCode==9)return;//tab键
                     if(keyCode==32){//32空格，模拟滚动一页
@@ -13961,14 +15800,14 @@ ImgOps | https://imgops.com/#b#`;
                     };
                     container.addEventListener('keyup',keyUpHandler,false);
 
-                },true);
+                });
 
 
                 var imgDraged;
                 eleMaps['img-parent'].addEventListener('mousedown',function(e){//如果图片尺寸大于屏幕的时候按住图片进行拖移
                     var target=e.target;
-                    if(e.button!=0 || target.nodeName!='IMG')return;
-                    var bigger=target.classList.contains('pv-gallery-img_zoom-out');//如果是大于屏幕
+                    if(e.button!=0 || target.nodeName.toUpperCase()!='IMG')return;
+                    var bigger=target.classList.contains('pv-gallery-img_zoom-out') || self.scaleByScreen;//如果是大于屏幕
 
                     var oClient={
                         x:e.clientX,
@@ -13982,6 +15821,8 @@ ImgOps | https://imgops.com/#b#`;
 
                     var moveFiredCount=0;
                     var moveHandler=function(e){
+                        e.preventDefault();
+                        e.stopPropagation();
                         moveFiredCount++;
                         if(moveFiredCount<2){//给个缓冲。。
                             return;
@@ -14011,9 +15852,62 @@ ImgOps | https://imgops.com/#b#`;
                     document.addEventListener('mouseup',upHandler,true);
                 },true);
 
+                function popupFiddleWindow(target) {
+                    if (self.img === null || self.img.style.display === 'none') return;
+                    if (/^video$/i.test(target.nodeName)) {
+                        let classNameBak = target.className;
+                        let fiddleWindow = new ImgWindowC(target, {...self.getPropBySpanMark(self.selected), src: target.src});
+                        self.img = null;
+                        fiddleWindow.imgWindow.addEventListener("pv-removeImgWindow", e => {
+                            if (self.img == null) {
+                                target.style.width = "";
+                                target.style.height = "";
+                                target.style.opacity = 1;
+                                eleMaps['img-parent'].appendChild(target);
+                                self.img = target;
+                                self.img.className = classNameBak;
+                            }
+                        });
+                        return;
+                    }
+
+                    let listenRemove = (img) => {
+                        var fiddleWindow = new ImgWindowC(img, {...self.getPropBySpanMark(self.selected), src: img.src});
+                        fiddleWindow.imgWindow.addEventListener("pv-removeImgWindow", e => {
+                            if (self.img.style.display === 'none') {
+                                self.img.style.display = "";
+                            }
+                        });
+                    }
+                    target.style.display = "none";
+                    imgReady(self.src, {
+                        ready:function() {
+                            listenRemove(this);
+                        },
+                        error:function(e) {
+                            var t_img = document.createElement('img');
+                            t_img.src = self.img.src;
+                            listenRemove(t_img);
+                        }
+                    });
+                }
+                eleMaps['img-parent'].addEventListener('mousedown',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                },true);
+                eleMaps['img-parent'].addEventListener('mouseup',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                },true);
+                eleMaps['img-parent'].addEventListener('mousemove',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                },true);
                 eleMaps['img-parent'].addEventListener('click',function(e){//点击图片本身就行图片缩放处理
+                    e.preventDefault();
+                    e.stopPropagation();
                     var target=e.target;
-                    if(e.button!=0 || target.nodeName!='IMG')return;
+                    if(e.button!=0 || !/^(video|img)$/i.test(target.nodeName))return;
 
                     if(imgDraged){//在拖动后触发的click事件，取消掉。免得一拖动完就立即进行的缩放。。。
                         imgDraged=false;
@@ -14033,40 +15927,29 @@ ImgOps | https://imgops.com/#b#`;
                     }else if(target.classList.contains('pv-gallery-img_zoom-out')){
                         self.fitContains=true;
                         self.fitToScreen();
-                    };
+                    }else{
+                        popupFiddleWindow(target);
+                    }
                 },true);
                 eleMaps['img-parent'].addEventListener('dblclick',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
                     var target=e.target;
-                    if(self.hideImg && self.hideImg.parentNode){
-                        return;
-                    }else{
-                        self.hideImg=target;
-                    }
-                    if(e.button!=0 || target.nodeName!='IMG')return;
+                    if(e.button!=0 || !/^(video|img)$/i.test(target.nodeName))return;
+                    if (!target.classList.contains('pv-gallery-img_zoom-in') && !target.classList.contains('pv-gallery-img_zoom-out')) return;
 
                     if(imgDraged){
                         imgDraged=false;
                         return;
                     };
-                    target.style.display="none";
-                    imgReady(self.src,{
-                        ready:function(){
-                            var fiddleWindow=new ImgWindowC(this);
-                            fiddleWindow.imgWindow.addEventListener("pv-removeImgWindow", e=>{
-                                if(self.hideImg && self.hideImg.parentNode){
-                                    self.hideImg.style.display="";
-                                    self.hideImg=null;
-                                }
-                            });
-                        },
-                    });
+                    popupFiddleWindow(target);
                 },true);
 
 
                 container.addEventListener('mousedown',function(e){//鼠标按在导航上，切换图片
                     if(e.button!=0)return;//左键
                     var target=e.target;
-                    if(target.nodeName=='IMG')e.preventDefault();
+                    if(target.nodeName.toUpperCase()=='IMG')e.preventDefault();
 
                     var matched=true;
                     var stop;
@@ -14103,7 +15986,7 @@ ImgOps | https://imgops.com/#b#`;
                     var targetP;
                     if(!dataset(target,'src') && (targetP=target.parentNode) && !dataset(targetP,'src'))return;
 
-                    self.select(targetP? targetP : target);
+                    self.select(targetP || target, false, true);
                 },false);
 
                 //点击读取错误的图片占位符重新读取
@@ -14114,67 +15997,158 @@ ImgOps | https://imgops.com/#b#`;
                         self.getImg(self.errorSpan);
                     };
                 },false);
-                if(prefs.gallery.viewmoreLayout==1){
-                    eleMaps['maximize-container'].classList.add("pv-gallery-flex-maximize");
-                }
 
-                if(prefs.gallery.viewmoreEndless){
+                if(prefs.gallery.viewmoreEndless || prefs.gallery.scrollEndAndLoad){
+                    var isScrolling = false;
                     addWheelEvent(eleMaps['maximize-container'],function(e){
-                        if(!self.haveMorePage)return;
-                        let scrollCon=self.eleMaps['maximize-container'].parentNode;
-                        let scrollPercent=scrollCon.scrollTop / (scrollCon.scrollHeight - scrollCon.clientHeight);
-                        if(scrollPercent>0.8){
-                            var textSpan=self.eleMaps['head-command-nextPage'].querySelector("span");
-                            if(textSpan.innerHTML==i18n("loading")){
-                                return;
+                        if (isScrolling) return;
+                        isScrolling = true;
+                        setTimeout(() => {
+                            isScrolling = false;
+                            let scrollCon=self.eleMaps['maximize-container'].parentNode;
+                            let scrollPercent=scrollCon.scrollTop / (scrollCon.scrollHeight - scrollCon.clientHeight);
+                            if(scrollPercent>0.8){
+                                if (prefs.gallery.scrollEndAndLoad) {
+                                    self.scrollToEndAndReload();
+                                }
+                                if(!self.haveMorePage)return;
+                                var textSpan=self.eleMaps['head-command-nextPage'].querySelector("span");
+                                if(textSpan.innerHTML==i18n("loading")){
+                                    return;
+                                }
+                                setHTML(textSpan, i18n("loading"));
+                                self.completePages=[];
+                                self.pageAllReady=false;
+                                self.pageAction(true, true);
                             }
-                            textSpan.innerHTML=createHTML(i18n("loading"));
-                            self.completePages=[];
-                            self.pageAllReady=false;
-                            self.pageAction(true, true);
-                        }
+                        }, 100);
                     })
                 }
-                self.urlFilter="";
+
+
+                self.batchDl=document.createElement('p');
+                let batchDlBtn=document.createElement('input');
+                let cancelBtn=document.createElement('input');
+                let selectAllBtn=document.createElement('input');
+                let invertBtn=document.createElement('input');
+                let compareBtn=document.createElement('input');
+                let checkBoxs;
+                let maximizeContainer = eleMaps['maximize-container'];
+                batchDlBtn.value=i18n("download");
+                cancelBtn.value=i18n("closeBtn");
+                selectAllBtn.value=i18n("selectAllBtn");
+                invertBtn.value=i18n("invertBtn");
+                compareBtn.value=i18n("compareBtn");
+                batchDlBtn.type="button";
+                cancelBtn.type="button";
+                cancelBtn.className="need-checked";
+                selectAllBtn.type="button";
+                invertBtn.type="button";
+                invertBtn.className="need-checked";
+                compareBtn.type="button";
+                compareBtn.className = "compareBtn";
+                compareBtn.onclick=function(e){
+                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
+                    if(checkBoxs.length<2)return;
+                    let imgSrcs=[];
+                    [].forEach.call(checkBoxs, function(node){
+                        let conItem=node.parentNode;
+                        if(conItem.style.display=="none")return;
+                        let imgSrc=conItem.querySelector("img").src;
+                        imgSrcs.push(imgSrc);
+                    });
+                    if(imgSrcs.length<2)return;
+                    let mainImg=document.createElement("img");
+                    mainImg.src=imgSrcs.shift();
+                    let mainImgWin=new ImgWindowC(mainImg);
+                    mainImgWin.compare(imgSrcs);
+                };
+                batchDlBtn.onclick=async function(e){
+                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
+                    if(checkBoxs.length<1)checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input");
+
+                    var saveParams = [],saveIndex=0;
+                    for (const node of checkBoxs) {
+                        let conItem=node.parentNode;
+                        if(conItem.style.display=="none")return;
+                        saveIndex++;
+
+                        if (conItem.dataset.xhr) {
+                            self.showTips("Sending request...", 3000);
+                            await new Promise((resolve) => {
+                                let getxhroverHandler = e => {
+                                    conItem.removeEventListener('getxhrover', getxhroverHandler);
+                                    resolve();
+                                };
+                                conItem.addEventListener('getxhrover', getxhroverHandler);
+                                conItem.dispatchEvent(new Event('getxhr'));
+                            });
+                        }
+
+                        let imgSrc=conItem.querySelector("img").dataset.src || conItem.querySelector("img").src;
+                        let title=node.nextElementSibling.title;
+                        title = title.indexOf('\n') !== -1 ? title.split('\n')[0] : title;
+                        title = title.indexOf('http') === 0 || title.indexOf('data') === 0 ? '' : title;
+                        title = getSaveName(imgSrc, title, prefs.saveName, self.getPropBySpanMark(conItem._spanMark));
+                        var picName = String(saveIndex).padStart(3, '0') + '-' + title;
+                        saveParams.push([imgSrc, picName]);
+                    }
+                    self.batchDownload(saveParams, ()=>{
+                        self.showTips("Completed!", 1000);
+                    });
+                };
+                cancelBtn.onclick=function(e){
+                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
+                    [].forEach.call(checkBoxs, i=>{
+                        i.checked=false;
+                    });
+                    maximizeContainer.classList.remove("checked");
+                };
+                invertBtn.onclick=function(e){
+                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input");
+                    if(checkBoxs.length<1)return;
+                    [].forEach.call(checkBoxs, i=>{
+                        let conItem=i.parentNode;
+                        if(conItem.style.display=="none")i.checked=false;
+                        else i.checked=!i.checked;
+                    });
+                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
+                    if(checkBoxs.length==0){
+                        maximizeContainer.classList.remove("checked");
+                    }
+                };
+                selectAllBtn.onclick=function(e){
+                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input");
+                    if(checkBoxs.length<1)return;
+                    [].forEach.call(checkBoxs, i=>{
+                        let conItem=i.parentNode;
+                        if(conItem.style.display=="none")i.checked=false;
+                        else i.checked=true;
+                    });
+                    maximizeContainer.classList.add("checked");
+                };
+                self.batchDl.appendChild(batchDlBtn);
+                self.batchDl.appendChild(cancelBtn);
+                self.batchDl.appendChild(selectAllBtn);
+                self.batchDl.appendChild(invertBtn);
+                self.batchDl.appendChild(compareBtn);
+                maximizeContainer.parentNode.appendChild(self.batchDl);
 
                 eleMaps['head'].addEventListener('click',function(e){//顶栏上面的命令
                     if(e.button!=0)return;
                     var target=e.target;
                     if(eleMaps['head-command-close']==target){
                         self.close();
-                    }else if(eleMaps['head-command-operate'].contains(target)){
-                        imgReady(self.src,{
-                            ready:function(){
-                                new ImgWindowC(this);
-                            },
-                        });
                     }else if(eleMaps['head-command-nextPage'].contains(target)){
                         var textSpan=eleMaps['head-command-nextPage'].querySelector("span");
                         if(textSpan.innerHTML==i18n("loading")){
-                            textSpan.innerHTML=createHTML(i18n("loadAll"));
+                            setHTML(textSpan, i18n("loadAll"));
                             return;
                         }
-                        textSpan.innerHTML=createHTML(i18n("loading"));
+                        setHTML(textSpan, i18n("loading"));
                         self.completePages=[];
                         self.pageAllReady=false;
                         self.pageAction(true);
-                    }else if(eleMaps['head-command-urlFilter'].contains(target)){
-                        let urlFilterSpan=eleMaps['head-command-urlFilter'];
-                        let textSpan = urlFilterSpan.querySelector("span");
-                        if(self.urlFilter){
-                            self.urlFilter="";
-                            textSpan.style.color="";
-                            urlFilterSpan.title=i18n("urlFilterTip");
-                            self.changeMinView();
-                        }else{
-                            let regStr=prompt(i18n("urlFilterTip"));
-                            if(regStr){
-                                self.urlFilter=regStr;
-                                textSpan.style.color="#e9cccc";
-                                urlFilterSpan.title=regStr;
-                                self.changeMinView();
-                            }
-                        }
                     }else if(eleMaps['head-command-collect'].contains(target)){
                         if(collection.favorite){
                             collection.remove();
@@ -14209,87 +16183,238 @@ ImgOps | https://imgops.com/#b#`;
                 this._keyUpListener=this.keyUpListener.bind(this);
 
                 //插入动态生成的css数据。
-                this.globalSSheet.insertRule('.pv-gallery-sidebar-thumb-container{'+
+                _GM_addStyle('.pv-gallery-sidebar-thumb-container{'+
                                              ((isHorizontal ? 'width' : 'height') + ':'  + (isHorizontal ?  unsafeWindow.getComputedStyle(eleMaps['sidebar-thumbnails-container']).height : unsafeWindow.getComputedStyle(eleMaps['sidebar-thumbnails-container']).width)) +
-                                             '}',this.globalSSheet.cssRules.length);
+                                             '}');
 
                 this.forceRepaintTimes=0;
 
                 container.style.display='none';
+
+                let allData = new Map();
+                container.addEventListener("drop", async e => {
+                    e.preventDefault();
+                    self.eleMaps['img-parent'].style.pointerEvents = "";
+                    container.style.filter = "";
+                    var files = [...e.dataTransfer.items].map(
+                        item => item.getAsFileSystemHandle()
+                    );
+                    if (files.length) {
+                        async function handle(items, dir = "") {
+                            for await (let item of items) {
+                                let name = item.name;
+                                let path = dir + "/" + name;
+                                if (allData.has(path)) continue;
+                                if (item.kind === "directory") {
+                                    allData.set(path, true);
+                                    await handle(item.values(), path);
+                                } else if (item.kind === "file") {
+                                    let file = await item.getFile();
+                                    allData.set(path, true);
+                                    let src = URL.createObjectURL(file);
+                                    let media;
+                                    if (file.type.indexOf("image") === 0) {
+                                        media = document.createElement('img');
+                                    } else if (file.type.indexOf("audio") === 0) {
+                                        media = document.createElement('audio');
+                                        src = "audio:" + src;
+                                    } else if (file.type.indexOf("video") === 0) {
+                                        media = createVideo();
+                                        src = "video:" + src;
+                                    } else continue;
+                                    media.src = src;
+                                    media.title = path;
+                                    var result = {
+                                        src: src,
+                                        type: 'force',
+                                        imgSrc: src,
+                                        noActual:true,
+                                        description: path,
+                                        img: media
+                                    };
+                                    self.data.push(result);
+                                    self._appendThumbSpans([result]);
+                                }
+                            }
+                        }
+                        await handle(files);
+                        self.loadThumb();
+                    }
+                });
+
+                container.addEventListener("dragover", e => {
+                    return e.preventDefault();
+                });
+                container.addEventListener("dragenter", e => {
+                    self.eleMaps['img-parent'].style.pointerEvents = "none";
+                    container.style.filter = "contrast(0.5)";
+                });
+                container.addEventListener("dragleave", e => {
+                    self.eleMaps['img-parent'].style.pointerEvents = "";
+                    container.style.filter = "";
+                });
+
                 this.shown=false;
 
                 // 我添加的部分
                 this.initToggleBar();
                 this.initZoom();
             },
-            showTips:function(content){
+            addImageUrls: function(urls) {
+                let imgs = [], self = this;
+                [].forEach.call(urls.split(/\s+/), function(i) {
+                    var varNum = /\[\d+\-\d+\]/.exec(i);
+                    if (varNum) {
+                        varNum = varNum[0].trim();
+                    } else {
+                        imgs.push(i);
+                        return;
+                    }
+                    var num1 = /\[(\d+)/.exec(varNum)[1].trim();
+                    var num2 = /(\d+)\]/.exec(varNum)[1].trim();
+                    var num1Int = parseInt(num1);
+                    var num2Int = parseInt(num2);
+                    var numLen = num1.length;
+                    var needAdd = num1.charAt(0) == "0";
+                    if (num1Int >= num2Int) return;
+                    for (var j = num1Int; j <= num2Int; j++) {
+                        var urlIndex = j.toString();
+                        if (needAdd) {
+                            while (urlIndex.length < numLen) urlIndex = "0" + urlIndex;
+                        }
+                        var curUrl = i.replace(/\[\d+\-\d+\]/, urlIndex).trim();
+                        imgs.push(curUrl);
+                    }
+                });
+                imgs.forEach(imgSrc => {
+                    if (imgSrc.indexOf("$") === 0 || imgSrc.indexOf("￥") === 0) {
+                        self.addPageImages(imgSrc.slice(1));
+                        return;
+                    }
+                    let img = document.createElement('img');
+                    img.src = imgSrc;
+                    var result = {
+                        src: img.src,
+                        type: 'force',
+                        imgSrc: img.src,
+
+                        noActual: true,
+                        description: '',
+
+                        img: img
+                    };
+                    self.data.push(result);
+                    self._appendThumbSpans([result]);
+                });
+                self.loadThumb();
+                self.changeSizeInputReset();
+            },
+            rotateBigImg:function(){
+                if (this.img) this.img.style[support.cssTransform] = 'rotate(' + (this.galleryRotate || 0) + 'deg)';
+            },
+            showTips:function(content, time){
                 var tipsWords=this.eleMaps["tipsWords"];
+                if (!content) {
+                    tipsWords.style.opacity = 0;
+                    tipsWords.innerText = "";
+                    return;
+                }
                 tipsWords.style.opacity=0.8;
                 tipsWords.innerText=content;
                 tipsWords.style.marginLeft=-tipsWords.offsetWidth/2+"px";
-                setTimeout(()=>{tipsWords.style.opacity=0},1500);
+                clearTimeout(this.tipsTimeout);
+                this.tipsTimeout=setTimeout(()=>{tipsWords.style.opacity=0},(time||1500));
             },
             showCompressProgress:function(meta){
-                console.debug(meta);
-                this.showTips(parseInt(meta.percent)+"% Compress "+(meta.currentFile||""));
+                //console.debug(meta);
+                this.showTips(parseInt(meta.percent)+"% Compress "+(meta.currentFile||""), 100000);
             },
-            batchDownload:function(saveParams, callback){
-                var self=this;
-                if(prefs.gallery.downloadWithZip){
-                    self.showTips(i18n("galleryDownloadWithZipAlert"));
-                    var zip = new JSZip(),downloaded=0;
-                    var fileName = document.title + ".zip";
+            batchDownload: function(saveParams, callback) {
+                var self = this;
+                if (prefs.gallery.downloadWithZip) {
+                    self.showTips(i18n("galleryDownloadWithZipAlert"), 100000);
+                    var zip, downloaded = 0, ext, packName = document.title;
+                    if (unsafeWindow.pvcepPackAddon) {
+                        packName += "." + unsafeWindow.pvcepPackAddon.ext;
+                        zip = new unsafeWindow.pvcepPackAddon.pack(packName);
+                    } else if (!!unsafeWindow.pvcepimg2pdf) {
+                        packName += ".pdf";
+                        zip = new unsafeWindow.pvcepimg2pdf(packName);
+                    } else {
+                        packName += ".zip";
+                        zip = new JSZip();
+                    }
                     var len = saveParams.length;
-                    function downloadOne(imgSrc, imgName){
-                        if(/^data:/.test(imgSrc) || imgSrc.split("/")[2]==document.domain){
-                            self.dataURLToCanvas(imgSrc, canvas=>{
-                                self.showTips("Downloading "+(downloaded+1)+"/"+len);
-                                if(!canvas){
-                                    console.debug("error: "+imgSrc);
-                                    downloaded++;
-                                    if(downloaded == len){
-                                        self.showTips("Begin compress to ZIP...");
-                                        zip.generateAsync({type:"blob"}, meta=>{self.showCompressProgress(meta)}).then(function(content){
-                                            saveAs(content, fileName);
-                                            callback();
-                                        })
-                                    }
-                                    return;
-                                }
-                                canvas.toBlob(blob=>{
-                                    zip.file(imgName.replace(/\//g,"").replace(/\.[^\.]+$/,"")+'.jpg',blob);
-                                    downloaded++;
-                                    if(downloaded == len){
-                                        self.showTips("Begin compress to ZIP...");
-                                        zip.generateAsync({type:"blob"}, meta=>{self.showCompressProgress(meta)}).then(function(content){
-                                            saveAs(content, fileName);
-                                            callback();
-                                        })
-                                    }
-                                }, "image/jpg");
-                            });
-                        }else{
-                            self.corsUrlToBlob(imgSrc, blob=>{
-                                if(blob)zip.file(imgName.replace(/\//g,"").replace(/\.[^\.]+$/,"")+'.jpg',blob);
-                                else console.debug("error: "+imgSrc);
+                    function downloadOne(imgSrc, imgName, over){
+                        let crosHandler = imgSrc => {
+                            urlToBlob(imgSrc, (blob, ext)=>{
+                                if (blob && blob.size>58) {
+                                    let fileName = imgName.replace(/\//g, "");
+                                    if (ext) fileName = fileName.replace(/\.\w+$/, "") + "." + ext;
+                                    zip.file(fileName, blob);
+                                } else console.debug("error: "+imgSrc);
                                 downloaded++;
-                                self.showTips("Downloading "+downloaded+"/"+len);
+                                over && over();
+                                self.showTips("Downloading "+downloaded+"/"+len, 1000000);
                                 if(downloaded == len){
-                                    self.showTips("Begin compress to ZIP...");
+                                    self.showTips(`Begin compress to ${packName}...`, 100000);
                                     zip.generateAsync({type:"blob"}, meta=>{self.showCompressProgress(meta)}).then(function(content){
-                                        saveAs(content, fileName);
+                                        if (content) {
+                                            saveAs(content, packName);
+                                        }
                                         callback();
                                     })
                                 }
                             });
                         }
+                        if(canvas && (/^data:/.test(imgSrc) || imgSrc.split("/")[2] == document.domain)){
+                            urlToBlobWithFetch(imgSrc, (blob, ext)=>{
+                                if(!blob){
+                                    crosHandler(imgSrc);
+                                    return;
+                                }
+                                self.showTips("Downloading "+(downloaded+1)+"/"+len, 1000000);
+                                let fileName = imgName.replace(/^data:.*/, "img").replace(/\//g,"");
+                                if (ext) fileName = fileName.replace(/\.\w+$/, "") + "." + ext;
+                                zip.file(fileName, blob);
+                                downloaded++;
+                                over && over();
+                                if(downloaded == len){
+                                    self.showTips(`Begin compress to ${packName}...`, 100000);
+                                    zip.generateAsync({type:"blob"}, meta=>{self.showCompressProgress(meta)}).then(function(content){
+                                        if (content) {
+                                            saveAs(content, packName);
+                                        }
+                                        callback();
+                                    })
+                                }
+                            });
+                        }else{
+                            crosHandler(imgSrc);
+                        }
                     }
                     if(prefs.gallery.downloadGap > 0){
-                        let downIntv=setInterval(()=>{
-                            let saveParam=saveParams.shift();
-                            if(!saveParam)clearInterval(downIntv);
-                            else downloadOne(saveParam[0], saveParam[1]);
-                        },prefs.gallery.downloadGap);
+                        let waitToDownloadOne = () => {
+                            setTimeout(() => {
+                                let saveParam = saveParams && saveParams.shift();
+                                if (!saveParam) clearInterval(downIntv);
+                                else downloadOne(saveParam[0], saveParam[1], waitToDownloadOne);
+                            }, prefs.gallery.downloadGap);
+                        };
+                        let threadNum = 10;
+                        if (prefs.gallery.downloadGap > 500) {
+                            threadNum = 1;
+                        } else if (prefs.gallery.downloadGap > 100) {
+                            threadNum = 5;
+                        }
+                        let downIntv = setInterval(() => {
+                            if (--threadNum === 0) {
+                                clearInterval(downIntv);
+                            }
+                            let saveParam = saveParams && saveParams.shift();
+                            if (!saveParam) clearInterval(downIntv);
+                            else downloadOne(saveParam[0], saveParam[1], waitToDownloadOne);
+                        }, prefs.gallery.downloadGap);
                     }else{
                         for(let i=0; i<len; i++){
                             downloadOne(saveParams[i][0], saveParams[i][1]);
@@ -14297,12 +16422,18 @@ ImgOps | https://imgops.com/#b#`;
                     }
                     return;
                 }
-
-                let download5Times=function(){
-                    for(let i=0;i<5;i++){
+                let threadNum = 10;
+                if (prefs.gallery.downloadGap > 500) {
+                    threadNum = 1;
+                } else if (prefs.gallery.downloadGap > 100) {
+                    threadNum = 5;
+                }
+                let downloadMulTimes=function(){
+                    self.showTips("Downloading...", 3000);
+                    for(let i=0;i<threadNum;i++){
                         let saveParam=saveParams.shift();
                         if(saveParam){
-                            _GM_download(saveParam[0], saveParam[1]);
+                            downloadNamedImg(saveParam[0], saveParam[1]);
                         }else{
                             callback();
                             break;
@@ -14310,66 +16441,76 @@ ImgOps | https://imgops.com/#b#`;
                     }
                     if(saveParams.length>0){
                         setTimeout(()=>{
-                            download5Times();
-                        },1000);
+                            downloadMulTimes();
+                        },prefs.gallery.downloadGap);
                     }
                 };
-                download5Times();
+                downloadMulTimes();
             },
             changeMinView:function(){
-                var urlReg=new RegExp(this.urlFilter);
-                var sizeInputH=this.gallery.querySelector("#minsizeH");
-                var sizeInputW=this.gallery.querySelector("#minsizeW");
+                var sizeInputH=this.sizeInputH;
+                var sizeInputW=this.sizeInputW;
                 var sizeInputHSpan=this.gallery.querySelector("#minsizeHSpan");
                 var sizeInputWSpan=this.gallery.querySelector("#minsizeWSpan");
-                sizeInputH.title=sizeInputH.value+"px";
-                sizeInputHSpan.innerHTML=createHTML(Math.floor(sizeInputH.value)+"px");
-                sizeInputW.title=sizeInputW.value+"px";
-                sizeInputWSpan.innerHTML=createHTML(Math.floor(sizeInputW.value)+"px");
-
+                sizeInputH.title="min height: "+sizeInputH.value+"px";
+                setHTML(sizeInputHSpan, "H: "+Math.floor(sizeInputH.value)+"px");
+                sizeInputW.title="min width: "+sizeInputW.value+"px";
+                setHTML(sizeInputWSpan, "W: "+Math.floor(sizeInputW.value)+"px");
+                clearTimeout(this.saveDefaultSize);
                 var self=this;
+                this.saveDefaultSize = setTimeout(() => {
+                    self.curDefaultSize = {h: sizeInputH.value, w: sizeInputW.value};
+                    storage.setListItem("minSize", location.hostname, self.curDefaultSize);
+                }, 1000);
+
                 var viewmoreShow = this.eleMaps['sidebar-toggle'].style.visibility == 'hidden';
                 if(viewmoreShow){
                     var maxSizeH=0,minSizeH=0,maxSizeW=0,minSizeW=0;
                     [].forEach.call(document.querySelectorAll(".maximizeChild>img"),function(item){
-                        var spanMark;
-                        try{
-                            spanMark=document.querySelector('span.pv-gallery-sidebar-thumb-container[data-src="'+item.src+'"]');
-                        }catch(e){
-                            spanMark=document.querySelector("span.pv-gallery-sidebar-thumb-container[data-src='"+item.src+"']");
-                        }
+                        var spanMark=self._spanMarkPool[item.src];
                         if(spanMark && !spanMark.dataset.naturalSize && item.naturalWidth && item.naturalHeight){
                             spanMark.dataset.naturalSize=JSON.stringify({w:item.naturalWidth,h:item.naturalHeight});
+                            let key = item.naturalWidth + "x" + item.naturalHeight;
+                            self.sizeMap[key] = (self.sizeMap[key] || 0) + 1;
+                            if (self.sizeMap[key] === 2) {
+                                let option = document.createElement("option");
+                                option.innerText = key;
+                                option.value = item.naturalWidth + "-" + item.naturalWidth + "x" + item.naturalHeight + "-" + item.naturalHeight;
+                                self.pinSize.appendChild(option);
+                            }
                         }
-                        if(item.naturalWidth<sizeInputW.value || item.naturalHeight<sizeInputH.value || !urlReg.test(item.src) || (self.lockMaxSize && (item.naturalWidth>self.lockMaxSize.w || item.naturalHeight>self.lockMaxSize.h))){
+                        if(!self.filterImage(item.naturalWidth || item.sizeW, item.naturalHeight || item.sizeH, item.src)){
                             item.parentNode.style.display="none";
                             if(spanMark)spanMark.style.display="none";
                         }else{
                             item.parentNode.style.display="";
                             if(spanMark)spanMark.style.display="";
                         }
-                        if(item.naturalHeight>maxSizeH)
-                            maxSizeH=item.naturalHeight;
-                        if(item.naturalHeight<minSizeH || minSizeH==0)
-                            minSizeH=item.naturalHeight;
-                        if(item.naturalWidth>maxSizeW)
-                            maxSizeW=item.naturalWidth;
-                        if(item.naturalWidth<minSizeW || minSizeW==0)
-                            minSizeW=item.naturalWidth;
+                        if (item.naturalHeight && item.naturalWidth) {
+                            if(item.naturalHeight>maxSizeH)
+                                maxSizeH=item.naturalHeight;
+                            if(item.naturalHeight<minSizeH || minSizeH==0)
+                                minSizeH=item.naturalHeight;
+                            if(item.naturalWidth>maxSizeW)
+                                maxSizeW=item.naturalWidth;
+                            if(item.naturalWidth<minSizeW || minSizeW==0)
+                                minSizeW=item.naturalWidth;
+                        }
                     });
                     sizeInputH.max=maxSizeH;
                     sizeInputH.min=minSizeH;
-                    sizeInputH.title=sizeInputH.value+"px";
-                    sizeInputHSpan.innerHTML=createHTML(Math.floor(sizeInputH.value)+"px");
+                    sizeInputH.title="min height: "+sizeInputH.value+"px";
+                    setHTML(sizeInputHSpan, "H: "+Math.floor(sizeInputH.value)+"px");
 
                     sizeInputW.max=maxSizeW;
                     sizeInputW.min=minSizeW;
-                    sizeInputW.title=sizeInputW.value+"px";
-                    sizeInputWSpan.innerHTML=createHTML(Math.floor(sizeInputW.value)+"px");
+                    sizeInputW.title="min width: "+sizeInputW.value+"px";
+                    setHTML(sizeInputWSpan, "W: "+Math.floor(sizeInputW.value)+"px");
+                    this.bricksInstance.pack();
                 }else{
                     this.data.forEach(function(item) {
                         if(!item)return;
-                        var spanMark=document.querySelector("span.pv-gallery-sidebar-thumb-container[data-thumb-src='"+item.imgSrc+"']");
+                        var spanMark=self._spanMarkPool[item.src];
                         if(spanMark){
                             var naturalSize=spanMark.dataset.naturalSize,itemW=item.sizeW,itemH=item.sizeH;
                             if(naturalSize){
@@ -14382,7 +16523,7 @@ ImgOps | https://imgops.com/#b#`;
                                 //itemW=99999;
                                 //itemH=99999;
                             }
-                            if(itemW<sizeInputW.value || itemH<sizeInputH.value || !urlReg.test(item.src) || (self.lockMaxSize && (itemW>self.lockMaxSize.w || itemH>self.lockMaxSize.h))){
+                            if(!self.filterImage(itemW, itemH, item.src)){
                                 spanMark.style.display="none";
                             }else{
                                 spanMark.style.display="";
@@ -14394,13 +16535,13 @@ ImgOps | https://imgops.com/#b#`;
             },
             changeSizeInputReset:function(){
                 var maxSizeH=0,minSizeH=0,maxSizeW=0,minSizeW=0;
-                var sizeInputH=this.gallery.querySelector("#minsizeH");
-                var sizeInputW=this.gallery.querySelector("#minsizeW");
+                var sizeInputH=this.sizeInputH;
+                var sizeInputW=this.sizeInputW;
                 let self=this;
                 this.data.forEach(function(item) {
                     if(!item)return;
                     var itemW=item.sizeW,itemH=item.sizeH;
-                    var spanMark=self._spanMarkPool[item.imgSrc];
+                    var spanMark=self._spanMarkPool[item.src];
                     if(spanMark){
                         var naturalSize=spanMark.dataset.naturalSize;
                         if(naturalSize){
@@ -14411,26 +16552,32 @@ ImgOps | https://imgops.com/#b#`;
                     }
                     if(itemH>maxSizeH)
                         maxSizeH=itemH;
-                    if(itemH<minSizeH || minSizeH==0)
+                    if((itemH > 0 && itemH < minSizeH) || minSizeH==0)
                         minSizeH=itemH;
                     if(itemW>maxSizeW)
                         maxSizeW=itemW;
-                    if(itemW<minSizeW || minSizeW==0)
+                    if((itemW > 0 && itemW < minSizeW) || minSizeW==0)
                         minSizeW=itemW;
                 });
                 sizeInputH.max=maxSizeH;
                 sizeInputH.min=minSizeH;
-                sizeInputH.value=prefs.gallery.defaultSizeLimit.h;
-                sizeInputH.title=sizeInputH.value+"px";
-                var sizeInputHSpan=this.gallery.querySelector("#minsizeHSpan");
-                sizeInputHSpan.innerHTML=createHTML(Math.floor(sizeInputH.value)+"px");
-
                 sizeInputW.max=maxSizeW;
                 sizeInputW.min=minSizeW;
-                sizeInputW.value=prefs.gallery.defaultSizeLimit.w;
-                sizeInputW.title=sizeInputW.value+"px";
+                if (self.curDefaultSize) {
+                    sizeInputH.value = self.curDefaultSize.h;
+                    sizeInputW.value = self.curDefaultSize.w;
+                } else {
+                    sizeInputH.value = prefs.gallery.defaultSizeLimit.h;
+                    sizeInputW.value = prefs.gallery.defaultSizeLimit.w;
+                }
+                sizeInputH.title="min height: "+sizeInputH.value+"px";
+                var sizeInputHSpan=this.gallery.querySelector("#minsizeHSpan");
+                setHTML(sizeInputHSpan, "H: "+Math.floor(sizeInputH.value)+"px");
+
+                sizeInputW.title="min width: "+sizeInputW.value+"px";
                 var sizeInputWSpan=this.gallery.querySelector("#minsizeWSpan");
-                sizeInputWSpan.innerHTML=createHTML(Math.floor(sizeInputW.value)+"px");
+                setHTML(sizeInputWSpan, "W: "+Math.floor(sizeInputW.value)+"px");
+                self.loadThumb();
             },
             initToggleBar: function() {  // 是否显示切换 sidebar 按钮
                 /**
@@ -14439,7 +16586,7 @@ ImgOps | https://imgops.com/#b#`;
                 */
                 if (prefs.gallery.sidebarToggle) {
                     var toggleBar = this.eleMaps['sidebar-toggle'];
-                    toggleBar.style.display = 'block';
+                    toggleBar.style.display = 'flex';
                     toggleBar.style.height = '12px';
                     toggleBar.addEventListener('click', this.showHideBottom.bind(this), false);
 
@@ -14486,7 +16633,7 @@ ImgOps | https://imgops.com/#b#`;
                         return words.join(" ");
                     };
                 maximizeContainer.style.minHeight = 0;
-                maximizeContainer.parentNode.style.visibility = "hidden";
+                maximizeContainer.parentNode.style.display = "none";
                 if(this.hideBodyStyle.parentNode)
                     this.hideBodyStyle.parentNode.removeChild(this.hideBodyStyle);
                 imgPre.style.visibility = imgNext.style.visibility = toggleBar.style.visibility = sidebarContainer.style.visibility = 'visible';
@@ -14495,19 +16642,75 @@ ImgOps | https://imgops.com/#b#`;
                 while (maximizeContainer.firstChild) {
                     maximizeContainer.removeChild(maximizeContainer.firstChild);
                 }
-                viewmoreBar.innerHTML = createHTML('✚');
+                setHTML(viewmoreBar, '✚');
                 viewmoreBar.parentNode.classList.remove("showmore");
                 //viewmoreBar.parentNode.style.backgroundColor = "#000000";
 
-                toggleBarContent.innerHTML = createHTML('▼');
-                this.changeSizeInputReset();
+                setHTML(toggleBarContent, '▼');
+                //this.changeSizeInputReset();
             },
             selectViewmore: function(imgSpan, src) {
                 if(this.curImgSpan)this.curImgSpan.classList.remove("selected");
                 imgSpan.classList.add("selected");
                 this.curImgSpan=imgSpan;
-                var node = document.querySelector('.pv-gallery-sidebar-thumb-container[data-src="'+src+'"]');
+                var node = this._spanMarkPool[src];
                 if(node)this.select(node);
+            },
+            addDlSpan: function(img, imgSpan, curNode, clickCb) {
+                var maximizeContainer = this.eleMaps['maximize-container'];
+                var dlSpan=document.createElement('p');
+                dlSpan.className="pv-bottom-banner";
+                setHTML(dlSpan, prefs.icons.downloadSvgBtn+' '+i18n("download"));
+                dlSpan.src=curNode.dataset.src;
+                dlSpan.title=curNode.title||document.title;
+                dlSpan.onclick=clickCb;
+                var topP=document.createElement('p');
+                topP.className="pv-top-banner";
+                var baseTextGetter = () => (img.naturalWidth + ' x ' + img.naturalHeight);
+                var baseText = baseTextGetter();
+                topP.textContent = baseText;
+                updateViewmoreSizeLabel(topP, baseText, curNode.dataset.src, 'local-only', baseTextGetter);
+                topP.title=dlSpan.title;
+                let hoverTimer = null;
+                let autoFetched = false;
+                let onEnter = () => {
+                    if (autoFetched || topP.textContent.indexOf("|") !== -1) return;
+                    hoverTimer = setTimeout(() => {
+                        autoFetched = true;
+                        scheduleViewmoreAutoSize(topP, baseText, curNode.dataset.src, baseTextGetter);
+                    }, 1000);
+                };
+                let onLeave = () => {
+                    if (hoverTimer) {
+                        clearTimeout(hoverTimer);
+                        hoverTimer = null;
+                    }
+                };
+                imgSpan.addEventListener("mouseenter", onEnter, true);
+                imgSpan.addEventListener("mouseleave", onLeave, true);
+                var checkBox=document.createElement('input');
+                checkBox.type="checkbox";
+                let self=this;
+                checkBox.onclick=function(e){
+                    let checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
+                    maximizeContainer.classList.remove("canCompare");
+                    if(checkBoxs.length>0){
+                        maximizeContainer.classList.add("checked");
+                        if (checkBoxs.length > 1) {
+                            maximizeContainer.classList.add("canCompare");
+                        }
+                    }else{
+                        maximizeContainer.classList.remove("checked");
+                    }
+                    e.stopPropagation();
+                };
+                topP.onclick=function(e){
+                    e.stopPropagation();
+                    checkBox.click();
+                };
+                imgSpan.appendChild(topP);
+                imgSpan.insertBefore(checkBox, imgSpan.firstChild);
+                imgSpan.appendChild(dlSpan);
             },
             addViewmoreItem: function(nodes) {
                 var alreadyShow = this.eleMaps['sidebar-toggle'].style.visibility == 'hidden';
@@ -14515,190 +16718,250 @@ ImgOps | https://imgops.com/#b#`;
                 var self=this;
                 var maximizeContainer = this.eleMaps['maximize-container'];
                 [].forEach.call(nodes, function(node){
-                    var nodeStyle=unsafeWindow.getComputedStyle(node);
-                    let curNode=node;
+                    var nodeStyle = unsafeWindow.getComputedStyle(node);
+                    let curNode = node;
                     let imgSpan = document.createElement('span');
-                    if(nodeStyle.display=="none")imgSpan.style.display="none";
-                    imgSpan.className = "maximizeChild";
-                    imgSpan.innerHTML = createHTML('<img src="'+curNode.dataset.src+'">');
-                    imgSpan.addEventListener("click", function(e){
-                        imgReady(curNode.dataset.src,{
-                            ready:function(){
-                                let imgwin=new ImgWindowC(this);
-                                self.selectViewmore(imgSpan, curNode.dataset.src);
-                                if(prefs.imgWindow.overlayer.shown){
-                                    imgwin.blur(true);
-                                    self.curImgWin=imgwin;
-                                    self.curImgSpan=imgSpan;
-                                    if(!self.scrollInit){
-                                        self.scrollInit=true;
-                                        let wheelHandler=function(e){
-                                            if(self.canScroll && self.curImgWin && !self.curImgWin.removed && !self.curImgWin.focused){
-                                                self.canScroll=false;
-                                                let targetImgSpan=self.curImgSpan;
-                                                while(targetImgSpan){
-                                                    targetImgSpan=e.deltaY<0?targetImgSpan.previousElementSibling:targetImgSpan.nextElementSibling;
-                                                    if(targetImgSpan && targetImgSpan.style.display!="none" && targetImgSpan.clientWidth>1)break;
-                                                }
-                                                if(targetImgSpan){
-                                                    self.curImgWin.remove();
-                                                    let curImgEle=document.createElement("img");
-                                                    curImgEle.src=targetImgSpan.querySelector("img").src;
-                                                    let imgwin=new ImgWindowC(curImgEle);
-                                                    imgwin.blur(true);
-                                                    self.curImgWin=imgwin;
-                                                    self.selectViewmore(targetImgSpan, curImgEle.src);
-                                                    targetImgSpan.scrollIntoView({block: "nearest", inline: "nearest"});
-                                                    self.canScroll=true;
-                                                    /*imgReady(targetImgSpan.querySelector("img").src,{
-                                                        ready:function(){
-                                                            self.curImgWin.remove(true);
-                                                            let imgwin=new ImgWindowC(this);
-                                                            imgwin.blur(true);
-                                                            self.curImgWin.imgWindow.style.opacity=0;
-                                                            self.curImgWin=imgwin;
-                                                            self.curImgSpan=targetImgSpan;
-                                                            self.canScroll=true;
-                                                        }
-                                                    });*/
-                                                }else{
-                                                    self.canScroll=true;
-                                                }
-                                            }
-                                        };
-                                        addWheelEvent(document.body,wheelHandler,true);
-                                    }
-                                }
-                            }
-                        });
-                    });
-                    imgSpan.title=curNode.title;
-                    let img=imgSpan.querySelector("img");
-                    var addDlSpan=(img, imgSpan, curNode, clickCb)=>{
-                        var dlSpan=document.createElement('p');
-                        dlSpan.className="pv-bottom-banner";
-                        dlSpan.innerHTML=createHTML('<svg class="icon" style="width: 20px;height: 20px;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1100"><path d="M768 768q0-14.857143-10.857143-25.714286t-25.714286-10.857143-25.714285 10.857143-10.857143 25.714286 10.857143 25.714286 25.714285 10.857143 25.714286-10.857143 10.857143-25.714286z m146.285714 0q0-14.857143-10.857143-25.714286t-25.714285-10.857143-25.714286 10.857143-10.857143 25.714286 10.857143 25.714286 25.714286 10.857143 25.714285-10.857143 10.857143-25.714286z m73.142857-128v182.857143q0 22.857143-16 38.857143t-38.857142 16H91.428571q-22.857143 0-38.857142-16t-16-38.857143v-182.857143q0-22.857143 16-38.857143t38.857142-16h265.714286l77.142857 77.714286q33.142857 32 77.714286 32t77.714286-32l77.714285-77.714286h265.142858q22.857143 0 38.857142 16t16 38.857143z m-185.714285-325.142857q9.714286 23.428571-8 40l-256 256q-10.285714 10.857143-25.714286 10.857143t-25.714286-10.857143L230.285714 354.857143q-17.714286-16.571429-8-40 9.714286-22.285714 33.714286-22.285714h146.285714V36.571429q0-14.857143 10.857143-25.714286t25.714286-10.857143h146.285714q14.857143 0 25.714286 10.857143t10.857143 25.714286v256h146.285714q24 0 33.714286 22.285714z" p-id="1101"></path></svg> '+i18n("download"));
-                        dlSpan.src=curNode.dataset.src;
-                        dlSpan.title=curNode.title||document.title;
-                        dlSpan.onclick=clickCb;
-                        var topP=document.createElement('p');
-                        topP.className="pv-top-banner";
-                        topP.innerHTML=createHTML(img.naturalWidth+' x '+img.naturalHeight);
-                        topP.title=img.src;
-                        var checkBox=document.createElement('input');
-                        checkBox.type="checkbox";
-                        checkBox.onclick=function(e){
-                            let checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
-                            if(!self.batchDl || self.batchDl.parentNode!=maximizeContainer){
-                                self.batchDl=document.createElement('p');
-                                let batchDlBtn=document.createElement('input');
-                                let cancelBtn=document.createElement('input');
-                                let invertBtn=document.createElement('input');
-                                batchDlBtn.value=i18n("download");
-                                cancelBtn.value=i18n("closeBtn");
-                                invertBtn.value=i18n("invertBtn");
-                                batchDlBtn.type="button";
-                                cancelBtn.type="button";
-                                invertBtn.type="button";
-                                batchDlBtn.onclick=function(e){
-                                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
-                                    if(checkBoxs.length<1)return;
-
-                                    var saveParams = [],saveIndex=0;
-                                    [].forEach.call(checkBoxs, function(node){
-                                        let conItem=node.parentNode;
-                                        if(conItem.style.display=="none")return;
-                                        saveIndex++;
-                                        let imgSrc=conItem.querySelector("img").src;
-                                        let title=node.nextElementSibling.title;
-                                        let srcSplit=imgSrc.replace(/[\?#].*/,"").split("/");
-                                        srcSplit=srcSplit[srcSplit.length-1];
-                                        if(srcSplit.length>30 && (srcSplit.indexOf(".")==-1 || /[&\?=,]/i.test(srcSplit))){
-                                            srcSplit="";
+                    imgSpan._spanMark = node;
+                    if (nodeStyle.display == "none") imgSpan.style.display = "none";
+                    let popupImgWin = (i) => {
+                        let imgwin=new ImgWindowC(i, {...self.getPropBySpanMark(curNode), src: i.src});
+                        if(prefs.imgWindow.overlayer.shown){
+                            imgwin.blur(true);
+                            self.curImgWin=imgwin;
+                            self.curImgSpan=imgSpan;
+                            if(!self.scrollInit){
+                                self.scrollInit=true;
+                                let wheelHandler=function(e){
+                                    if(self.canScroll && self.curImgWin && !self.curImgWin.removed && !self.curImgWin.focused){
+                                        self.canScroll=false;
+                                        let targetImgSpan=self.curImgSpan;
+                                        while(targetImgSpan){
+                                            targetImgSpan=e.deltaY<0?targetImgSpan.previousElementSibling:targetImgSpan.nextElementSibling;
+                                            if(targetImgSpan && targetImgSpan.style.display!="none" && targetImgSpan.clientWidth>1)break;
                                         }
-                                        if(srcSplit.length>50)srcSplit=srcSplit.substring(0,50);
-                                        var picName=document.title + "-" + (saveIndex<10?"00"+saveIndex:(saveIndex<100?"0"+saveIndex:saveIndex)) + (title==document.title?"":"-" + title) + "-" + srcSplit;
-                                        saveParams.push([imgSrc, picName]);
-                                    });
-                                    self.batchDownload(saveParams, ()=>{
-                                    });
-                                };
-                                cancelBtn.onclick=function(e){
-                                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
-                                    if(checkBoxs.length<1)return;
-                                    [].forEach.call(checkBoxs, i=>{
-                                        i.checked=false;
-                                    });
-                                    maximizeContainer.removeChild(self.batchDl);
-                                    maximizeContainer.classList.remove("checked");
-                                };
-                                invertBtn.onclick=function(e){
-                                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input");
-                                    if(checkBoxs.length<1)return;
-                                    [].forEach.call(checkBoxs, i=>{
-                                        let conItem=i.parentNode;
-                                        if(conItem.style.display=="none")i.checked=false;
-                                        else i.checked=!i.checked;
-                                    });
-                                    checkBoxs=maximizeContainer.querySelectorAll(".maximizeChild>input:checked");
-                                    if(checkBoxs.length==0){
-                                        maximizeContainer.removeChild(self.batchDl);
-                                        maximizeContainer.classList.remove("checked");
-                                    }
-                                };
-                                self.batchDl.appendChild(batchDlBtn);
-                                self.batchDl.appendChild(cancelBtn);
-                                self.batchDl.appendChild(invertBtn);
-                                maximizeContainer.appendChild(self.batchDl);
-                            }
-                            if(checkBoxs.length>0){
-                                maximizeContainer.appendChild(self.batchDl);
-                                maximizeContainer.classList.add("checked");
-                            }else{
-                                maximizeContainer.removeChild(self.batchDl);
-                                maximizeContainer.classList.remove("checked");
-                            }
-                            e.stopPropagation();
-                        };
-                        imgSpan.appendChild(topP);
-                        imgSpan.appendChild(checkBox);
-                        imgSpan.appendChild(dlSpan);
-                    };
-                    fetch(curNode.dataset.src).then(response=>{
-                        return response.blob();
-                    }).then(blob=>{
-                        imgReady(img,{
-                            ready:function(){
-                                if(img.width>=88 && img.height>=88){
-                                    addDlSpan(img, imgSpan, curNode, e=>{
-                                        e.stopPropagation();
-                                        if(blob.type=="image/webp"){
-                                            self.blobToCanvas(blob, canvas=>{
-                                                canvas.toBlob(blob=>{
-                                                    saveAs(blob,e.target.title+".png");
-                                                }, "image/png");
-                                            });
+                                        if(targetImgSpan){
+                                            let imgNode=targetImgSpan.querySelector("img");
+                                            self.curImgWin.remove();
+                                            let curImgEle=document.createElement("img");
+                                            curImgEle.src=imgNode.dataset.src||imgNode.src;
+                                            let imgwin=new ImgWindowC(curImgEle, {...self.getPropBySpanMark(targetImgSpan._spanMark), src: curImgEle.src});
+                                            imgwin.blur(true);
+                                            self.curImgWin=imgwin;
+                                            self.selectViewmore(targetImgSpan, imgNode.src);
+                                            targetImgSpan.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+                                            setTimeout(() => {targetImgSpan.scrollIntoView({block: "center", inline: "nearest"})}, 300);
+                                            self.canScroll=true;
                                         }else{
-                                            _GM_download(e.target.src,e.target.title+".jpg");
+                                            self.canScroll=true;
                                         }
-                                        return true;
-                                    });
-                                }
+                                    }
+                                };
+                                addWheelEvent(getBody(document),wheelHandler,true);
                             }
+                        }
+                    };
+                    imgSpan.className = "maximizeChild";
+                    let innerHTML = "";
+                    let thumbSrc = dataset(node, 'thumbSrc');
+                    let mode = matchedRule.getMode(thumbSrc);
+                    switch (mode) {
+                        case "video":
+                            let extra = "";
+                            if (thumbSrc.indexOf('.mkv') !== -1) extra = 'type="video/mp4"';
+                            else if (thumbSrc.indexOf('.m3u8') !== -1) extra = 'type="application/vnd.apple.mpegurl"';
+                            innerHTML = '<video data-src="' + dataset(node, 'src') + '" muted controls loop src="' + thumbSrc.replace(/^video:/, "") + '" ' + extra + ' ></video>';
+                            break;
+                        case "audio":
+                            innerHTML = '<img data-src="' + dataset(node, 'src') + '" src="' + prefs.icons.video + '" />';
+                            break;
+                        default:
+                            innerHTML = '<img data-src="' + dataset(node, 'src') + '" src="' + thumbSrc + '" />';
+                            break;
+                    }
+                    setHTML(imgSpan, innerHTML);
+                    let img=imgSpan.querySelector("img,video");
+                    let xhr = dataset(node, 'xhr') !== 'stop' && self.getPropBySpanMark(node, "xhr");
+                    let getXhr = async () => {
+                        let result = await new Promise((resolve) => {
+                            let xhrError = function() {
+                                dataset(node, 'xhr', 'stop');
+                                dataset(node, 'src', dataset(node, 'thumbSrc'));
+                                resolve(null);
+                            };
+                            xhrLoad.load({
+                                url: curNode.dataset.src,
+                                xhr: xhr,
+                                cb: function(imgSrc, imgSrcs, caption) {
+                                    if (imgSrc) {
+                                        dataset(node, 'src', imgSrc);
+                                        dataset(node, 'xhr', 'stop');
+                                        if (caption) dataset(node, 'description', caption);
+                                        img.dataset.src = imgSrc;
+                                        resolve(imgSrc);
+                                    } else {
+                                        xhrError();
+                                    }
+                                },
+                                onerror: xhrError
+                            });
                         });
-                    }).catch(e=>{
+                        imgSpan.removeEventListener('getxhr', getXhrHandler);
+                        delete imgSpan.dataset.xhr;
+                        imgSpan.dispatchEvent(new Event('getxhrover'));
+                        return result;
+                    };
+                    let getXhrHandler = e => {
+                        getXhr();
+                    };
+                    if (xhr) {
+                        imgSpan.dataset.xhr = true;
+                        imgSpan.addEventListener('getxhr', getXhrHandler);
+                    }
+                    imgSpan.addEventListener("click", async function(e) {
+                        if (maximizeContainer.classList.contains("checked")) {
+                            imgSpan.querySelector("input").click();
+                            return;
+                        }
+                        e.preventDefault();
+                        self.selectViewmore(imgSpan, curNode.dataset.src);
+                        let loadError = e => {
+                            if (/^blob:/.test(dataset(node, 'src'))) {
+                                let i = document.createElement("img");
+                                i.src = curNode.dataset.thumbSrc;
+                                curNode.dataset.src = curNode.dataset.thumbSrc;
+                                popupImgWin(i);
+                            } else {
+                                _GM_xmlhttpRequest({
+                                    method: 'GET',
+                                    url: dataset(node, 'src'),
+                                    responseType: 'blob',
+                                    onload: function(response) {
+                                        let i = document.createElement("img");
+                                        if (response.response.type !== "text/html" && response.response.size > 1000) {
+                                            const blobUrl = URL.createObjectURL(response.response);
+                                            i.src = blobUrl;
+                                            curNode.dataset.src = curNode.dataset.thumbSrc;
+                                            popupImgWin(i);
+                                            const releaseBlob = () => URL.revokeObjectURL(blobUrl);
+                                            window.addEventListener('beforeunload', releaseBlob);
+                                        } else {
+                                            i.src = curNode.dataset.thumbSrc;
+                                            curNode.dataset.src = curNode.dataset.thumbSrc;
+                                            popupImgWin(i);
+                                        }
+                                    },
+                                    onerror: function() {
+                                        let i = document.createElement("img");
+                                        i.src = curNode.dataset.thumbSrc;
+                                        curNode.dataset.src = curNode.dataset.thumbSrc;
+                                        popupImgWin(i);
+                                    }
+                                });
+                            }
+                        };
+                        let loadImg = async() => {
+                            self.showTips("Loading image...");
+
+                            let imgSrc = dataset(node, 'src');
+                            let mode = matchedRule.getMode(imgSrc);
+                            let media;
+                            let loaded = function() {
+                                media.play();
+                                self.showTips("");
+                                popupImgWin(this || media);
+                                media.removeEventListener('loadeddata', loaded);
+                            }
+                            switch (mode) {
+                                case "video":
+                                    media = createVideo();
+                                    media.style.width = 0;
+                                    media.style.height = 0;
+                                    media.controls = true;
+                                    media.loop = true;
+                                    media.autoplay = true;
+                                    media.volume = matchedRule.mute ? 0 : 1;
+                                    imgSrc = imgSrc.replace(/^video:/, "");
+                                    if (imgSrc.indexOf('.mkv') !== -1) media.type = 'video/mp4';
+                                    else if (imgSrc.indexOf('.m3u8') !== -1) {
+                                        try {
+                                            loaded();
+                                            await initVideojs(media, imgSrc);
+                                            imgSrc = "";
+                                        } catch (error) {
+                                            console.error('Failed to load or initialize Video.js player:', error);
+                                        }
+                                    }
+                                    break;
+                                case "audio":
+                                    media = document.createElement('audio');
+                                    media.controls = true;
+                                    media.autoplay = true;
+                                    media.volume = matchedRule.mute ? 0 : 1;
+                                    imgSrc = imgSrc.replace(/^audio:/, "");
+                                    break;
+                                default:
+                                    break;
+                            }
+                            if (media) {
+                                if (imgSrc) {
+                                    media.src = imgSrc;
+                                    media.addEventListener('loadeddata', loaded);
+                                    media.load();
+                                }
+                            } else {
+                                imgReady(imgSrc, {
+                                    ready: function() {
+                                        self.showTips("");
+                                        popupImgWin(this);
+                                    },
+                                    error:function(e){
+                                        self.showTips("");
+                                        loadError();
+                                    }
+                                });
+                            }
+                        };
+                        let xhr = dataset(node, 'xhr') !== 'stop' && self.getPropBySpanMark(node, "xhr");
+                        if (xhr) {
+                            self.showTips("Sending request...", 3000);
+                            let imgSrc = await getXhr();
+                            if (imgSrc) {
+                                loadImg();
+                            } else {
+                                loadError();
+                            }
+                            return;
+                        } else {
+                            imgSpan.removeEventListener('getxhr', getXhrHandler);
+                            delete imgSpan.dataset.xhr;
+                        }
+                        loadImg();
+                    });
+                    let curSrc=curNode.dataset.src;
+                    let defaultDl=()=>{
+                        self.addDlSpan(img, imgSpan, curNode, e=>{
+                            e.stopPropagation();
+                            downloadImg(curNode.dataset.src, curNode.title, prefs.saveName, null, self.getPropBySpanMark(curNode));
+                            return true;
+                        });
+                    };
+                    if(curSrc.indexOf("data")===0){
+                        defaultDl();
+                    }else{
+                        let needPack = !img.complete;
                         imgReady(img,{
                             ready:function(){
+                                needPack && self.bricksInstance.pack();
                                 if(img.width>=88 && img.height>=88){
-                                    addDlSpan(img, imgSpan, curNode, e=>{
+                                    self.addDlSpan(img, imgSpan, curNode, e=>{
                                         e.stopPropagation();
-                                        _GM_download(e.target.src,e.target.title+".jpg");
+                                        downloadImg(curNode.dataset.src, curNode.title, prefs.saveName, null, self.getPropBySpanMark(curNode));
                                         return true;
                                     });
                                 }
                             }
                         });
-                    });
+                    }
                     maximizeContainer.appendChild(imgSpan);
                 });
             },
@@ -14709,7 +16972,12 @@ ImgOps | https://imgops.com/#b#`;
                     imgPre = this.eleMaps['img-controler-pre'],
                     imgNext = this.eleMaps['img-controler-next'],
                     alreadyShow = toggleBar.style.visibility == 'hidden';
-                var sidebarContainer = this.eleMaps['sidebar-container'];
+
+                var sidebarContainer = this.eleMaps['sidebar-container'],
+                    isHidden = sidebarContainer.style.visibility == 'hidden';
+                if (isHidden) {
+                    this.showHideBottom();
+                }
                 var maximizeContainer = this.eleMaps['maximize-container'];
                 var sidebarPosition = prefs.gallery.sidebarPosition,
                     capitalize = function(string) { // 将字符串中每个单词首字母大写
@@ -14721,76 +16989,26 @@ ImgOps | https://imgops.com/#b#`;
                     };
                 if(alreadyShow){
                     this.closeViewMore();
+                    this.bricksInstance.resize(false);
                 }else{
+                    if (this.img && this.img.pause) {
+                        this.img.pause();
+                    }
                     maximizeContainer.style.minHeight = "100%";
-                    maximizeContainer.parentNode.style.visibility = "visible";
+                    maximizeContainer.parentNode.style.display = "block";
                     document.head.appendChild(this.hideBodyStyle);
                     imgPre.style.visibility = imgNext.style.visibility = toggleBar.style.visibility = sidebarContainer.style.visibility = 'hidden';
                     imgCon.style['border' + capitalize(sidebarPosition)] = '0';
                     toggleBar.style[sidebarPosition] = '0';
-                    maximizeContainer.innerHTML = createHTML("");
-                    viewmoreBar.innerHTML = createHTML('✖');
+                    setHTML(maximizeContainer, "");
+                    setHTML(viewmoreBar, '✖');
                     viewmoreBar.parentNode.classList.add("showmore");//.backgroundColor = "#2a2a2a";
 
-                    var nodes = document.querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]');
+                    var nodes = this.eleMaps['sidebar-thumbnails-container'].querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]:not(.ignore)');
                     this.addViewmoreItem(nodes);
+                    this.bricksInstance.pack();
+                    this.bricksInstance.resize(true);
                 }
-            },
-            corsUrlToBlob:function (url, cb){
-                if(!url)return cb(null);
-                let urlSplit=url.split("/");
-                _GM_xmlhttpRequest({
-                    method: 'GET',
-                    url: url,
-                    responseType:'arraybuffer',
-                    headers: {
-                        origin: urlSplit[0]+"//"+urlSplit[2],
-                        referer: url,
-                        accept: "*/*"
-                    },
-                    onload: function(d) {
-                        cb(d.response);
-                    },
-                    onerror: function(){
-                        cb(null);
-                    },
-                    ontimeout: function(){
-                        cb(null);
-                    }
-                });
-            },
-            dataURLToCanvas:function (dataurl, cb){
-                if(!dataurl)return cb(null);
-                var canvas = document.createElement('CANVAS');
-                var ctx = canvas.getContext('2d');
-                var img = new Image();
-                img.setAttribute("crossOrigin","anonymous");
-                img.onload = function(){
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    cb(canvas);
-                };
-                img.onerror = function(){
-                    cb(null);
-                };
-                img.src = dataurl;
-            },
-            blobToDataURL:function(blob, cb){
-                var a = new FileReader();
-                a.readAsDataURL(blob);
-                a.onload = function (e){
-                    cb(e.target.result);
-                };
-                a.onerror = function (e){
-                    cb(null);
-                }
-            },
-            blobToCanvas: function (blob, cb){
-                var self=this;
-                this.blobToDataURL(blob, function (dataurl){
-                    self.dataURLToCanvas(dataurl, cb);
-                });
             },
             showHideBottom: function() {  // 显示隐藏 sidebar-container
                 var sidebarContainer = this.eleMaps['sidebar-container'],
@@ -14814,15 +17032,15 @@ ImgOps | https://imgops.com/#b#`;
                 // 修正底部距离
                 this.eleMaps['sidebar-toggle'].style[sidebarPosition] = isHidden ? '-3px' : '0';
                 if(isHidden){
-                    this.eleMaps['sidebar-toggle'].classList.remove("pv-gallery-sidebar-toggle-hide");
+                    this.gallery.classList.remove("pv-gallery-sidebar-toggle-hide");
                 }else{
-                    this.eleMaps['sidebar-toggle'].classList.add("pv-gallery-sidebar-toggle-hide");
+                    this.gallery.classList.add("pv-gallery-sidebar-toggle-hide");
                 }
-                this.eleMaps['sidebar-toggle-content'].innerHTML = createHTML(isHidden ? '▼' : '▲');
+                setHTML(this.eleMaps['sidebar-toggle-content'], isHidden ? '▼' : '▲');
                 this.eleMaps['sidebar-viewmore'].style.visibility = isHidden ? 'visible' : 'hidden';
             },
             initZoom: function() {  // 如果有放大，则把图片及 sidebar 部分缩放比率改为 1
-                if (prefs.gallery.autoZoom && document.body.style.zoom != undefined) {
+                if (prefs.gallery.autoZoom && getBody(document).style.zoom != undefined) {
                     var oZoom = detectZoom();
                     if (oZoom > 100) {
                         this.eleMaps['body'].style.zoom = 100 / oZoom;
@@ -14830,16 +17048,37 @@ ImgOps | https://imgops.com/#b#`;
                 }
             },
 
-            getThumSpan:function(previous,relatedTarget){
+            getThumSpan:function(previous, relatedTarget, loop, random){
                 var ret;
                 var rt = relatedTarget || this.selected;
                 if(!rt)return;
-                while((rt=previous ? rt.previousElementSibling : rt.nextElementSibling)){
-                    if(rt.clientWidth!=0){
-                        ret=rt;
-                        break;
-                    };
-                };
+                if (random) {
+                    if (rt.clientWidth === 0) return;
+                    let sibling = rt.parentNode.children;
+                    while (rt = sibling[Math.floor(Math.random() * sibling.length)]) {
+                        if (rt.clientWidth !== 0) {
+                            ret = rt;
+                            break;
+                        }
+                    }
+                } else {
+                    while((rt=previous ? rt.previousElementSibling : rt.nextElementSibling)){
+                        if(rt.clientWidth!=0){
+                            ret=rt;
+                            break;
+                        }
+                    }
+                    if (loop && !ret) {
+                        rt = (relatedTarget || this.selected).parentNode;
+                        rt = previous ? rt.lastElementChild : rt.firstElementChild;
+                        while ((rt = previous ? rt.previousElementSibling : rt.nextElementSibling)) {
+                            if (rt.clientWidth != 0) {
+                                ret = rt;
+                                break;
+                            }
+                        }
+                    }
+                }
                 return ret;
             },
             previous:false,
@@ -14848,9 +17087,9 @@ ImgOps | https://imgops.com/#b#`;
                 this.select(this.getThumSpan(true));
             },
             selectNext:function(){
-                this.select(this.getThumSpan());
+                this.select(this.getThumSpan(), false, true);
             },
-            select:function(ele,noTransition){
+            select:function(ele, noTransition, checkEnd){
                 if(!ele || this.selected==ele)return;
                 if(this.selected){
                     this.selected.classList.remove(this.selectedClassName);
@@ -14860,16 +17099,20 @@ ImgOps | https://imgops.com/#b#`;
                 ele.classList.add('pv-gallery-sidebar-thumb_selected');
 
                 this.selected=ele;
-                this.arrowVisib();
+                this.arrowVisib(checkEnd);
 
                 var self=this;
                 clearTimeout(this.loadImgTimer);
                 if(prefs.gallery.transition){
                     this.loadImgTimer=setTimeout(function(){//快速跳转的时候不要尝试读取图片。
                         self.loadImg(ele);
+                        self.selectedIntoView(noTransition);
                     },200);
                 }else{
-                    self.loadImg(ele);
+                    setTimeout(function(){
+                        self.loadImg(ele);
+                        self.selectedIntoView(noTransition);
+                    },1);
                 }
 
                 this.selectedIntoView(noTransition);
@@ -14877,6 +17120,7 @@ ImgOps | https://imgops.com/#b#`;
                 this.slideShow.run('select');
             },
             loadThumb:function(){//读取可视范围里面的缩略图
+                if (!this.selected) return;
                 var self=this;
                 var pro=self.isHorizontal ? ['scrollLeft','clientWidth','offsetLeft','offsetWidth'] : ['scrollTop','clientHeight','offsetTop','offsetHeight'];
                 var thumbC=self.eleMaps['sidebar-thumbnails-container'];
@@ -14901,7 +17145,19 @@ ImgOps | https://imgops.com/#b#`;
                     if(dataset(span_i,'thumbLoaded'))continue;//已经加载了缩略图
 
                     thumb=document.createElement('img');
-                    thumb.src=dataset(span_i,'thumbSrc') || dataset(span_i,'src') || prefs.icons.brokenImg_small;
+                    let imgSrc = dataset(span_i,'thumbSrc') || dataset(span_i,'src') || prefs.icons.brokenImg_small;
+                    let mode = matchedRule.getMode(imgSrc);
+                    switch (mode) {
+                        case "video":
+                            thumb.src = prefs.icons.video;
+                            break;
+                        case "audio":
+                            thumb.src = prefs.icons.audio;
+                            break;
+                        default:
+                            thumb.src = imgSrc;
+                            break;
+                    }
                     thumb.className='pv-gallery-sidebar-thumb';
 
                     dataset(span_i,'thumbLoaded','true');
@@ -14923,9 +17179,12 @@ ImgOps | https://imgops.com/#b#`;
                 var thumBCClient=thumBC[pro[1]];
                 var scrollCenter=Math.max((thumBCClient - this.selected[pro[2]])/2,0);
 
-                this.thumbScrollbar.scroll(needScrollDis - scrollCenter,false,!noTransition);
+                let thumbScrollbar=this.thumbScrollbar;
+                setTimeout(function() {
+                    thumbScrollbar.scroll(needScrollDis - scrollCenter,false,!noTransition);
+                }, 0);
             },
-            getImg:function(ele){
+            getImg:async function(ele){
                 var self = this;
 
                 var src = dataset(ele,'src');
@@ -14933,22 +17192,47 @@ ImgOps | https://imgops.com/#b#`;
                 this.lastLoading=src;//记住最后读取的图片
                 this.isLoading=true;//表示选择的图片正在读取
 
+                //显示读取指示器。
+                var loadingIndicator=ele.querySelector('.pv-gallery-sidebar-thumb-loading');
+                if (loadingIndicator && loadingIndicator.style) loadingIndicator.style.display='block';
+
+
                 // 特殊的 xhr 方式获取
-                var xhr = dataset(ele, 'xhr');
+                var xhr = dataset(ele, 'xhr') !== 'stop' && this.getPropBySpanMark(ele, 'xhr');
                 if (xhr) {
                     var xhrError = function() {
-                        dataset(ele, 'xhr', '');
-                        dataset(ele, 'src', dataset(ele, 'thumb-src'));
+                        dataset(ele, 'xhr', 'stop');
+                        dataset(ele, 'src', dataset(ele, 'thumbSrc'));
                         self.getImg(ele);
                     };
                     xhrLoad.load({
                         url: src,
-                        xhr: JSON.parse(decodeURIComponent(xhr)),
-                        cb: function(imgSrc, imgSrcs, caption) {
+                        xhr: xhr,
+                        cb: function(imgSrc, imgSrcs, caption, captions) {
                             if (imgSrc) {
                                 dataset(ele, 'src', imgSrc);
-                                dataset(ele, 'xhr', '');
+                                dataset(ele, 'xhr', 'stop');
+                                if (caption) dataset(ele, 'description', caption);
                                 self.getImg(ele);
+                                if (imgSrcs && imgSrcs.length) {
+                                    let i = 0;
+                                    imgSrcs.forEach(src => {
+                                        if (src == imgSrc) return;
+                                        let img = document.createElement('img');
+                                        img.src = src;
+                                        let cap = captions && captions[i] ? captions[i] : caption;
+                                        imgReady(img,{
+                                            ready:function(){
+                                                let result = findPic(img);
+                                                if (cap) result.description = cap;
+                                                self.data.push(result);
+                                                self._appendThumbSpans([result]);
+                                                self.loadThumb();
+                                            }
+                                        });
+                                        i++;
+                                    })
+                                }
                             } else {
                                 xhrError();
                             }
@@ -14974,12 +17258,72 @@ ImgOps | https://imgops.com/#b#`;
                 };
 
 
-                //显示读取指示器。
-                var loadingIndicator=ele.querySelector('.pv-gallery-sidebar-thumb-loading');
-                loadingIndicator.style.display='block';
 
 
-                this.imgReady=imgReady(src,{
+                if (!src) return;
+                let media, mediaSrc = src;
+                let loaded = function() {
+                    var index = allLoading.indexOf(src);
+                    if (index != -1) {
+                        allLoading.splice(index,1);
+                    }
+
+                    if (src != self.lastLoading) return;
+
+                    if (loadingIndicator && loadingIndicator.style) loadingIndicator.style.display = '';
+                    if (preImgR) preImgR.abort();
+                    self.loadImg(media, ele);
+                    media.removeEventListener('loadeddata', loaded);
+                }
+                if (isVideoLink(src)) {
+                    media = createVideo();
+                    media.style.width = 0;
+                    media.style.height = 0;
+                    media.controls = true;
+                    media.loop = true;
+                    media.autoplay = true;
+                    media.volume = matchedRule.mute ? 0 : 1;
+                    mediaSrc = mediaSrc.replace(/^video:/, "");
+                    if (src.indexOf('.mkv') !== -1) media.type = 'video/mp4';
+                    else if (src.indexOf('.m3u8') !== -1) {
+                        try {
+                            loaded();
+                            await initVideojs(media, mediaSrc);
+                            media.onload = e => {
+                                self.imgNaturalSize = {
+                                    h:media.naturalHeight || 100,
+                                    w:media.naturalWidth || 100,
+                                };
+                                self.fitToScreen({
+                                    x:0,
+                                    y:0,
+                                });
+                            };
+                            mediaSrc = "";
+                        } catch (error) {
+                            console.error('Failed to load or initialize Video.js player:', error);
+                        }
+                    }
+                } else if (isAudioLink(src)) {
+                    media = document.createElement('audio');
+                    media.controls = true;
+                    media.autoplay = true;
+                    media.volume = matchedRule.mute ? 0 : 1;
+                    mediaSrc = mediaSrc.replace(/^audio:/, "");
+                }
+                if (media) {
+                    if (this.eleMaps['sidebar-toggle'].style.visibility == 'hidden') {
+                        media.autoplay = false;
+                    }
+                    if (mediaSrc) {
+                        media.src = mediaSrc;
+                        curLoadingMedia = media;
+                        media.addEventListener('loadeddata', loaded);
+                        media.load();
+                    }
+                    return;
+                }
+                this.imgReady=imgReady(src, {
                     ready:function(){
                         //从读取队列中删除自己
                         var index=allLoading.indexOf(src);
@@ -14989,9 +17333,9 @@ ImgOps | https://imgops.com/#b#`;
 
                         if(src!=self.lastLoading)return;
 
-                        loadingIndicator.style.display='';
+                        if (loadingIndicator && loadingIndicator.style) loadingIndicator.style.display='';
                         if(preImgR)preImgR.abort();
-                        self.loadImg(this,ele);
+                        self.loadImg(this, ele);
                     },
                     loadEnd:function(e){//在loadend后开始预读。
                         //从读取队列中删除自己
@@ -15001,12 +17345,13 @@ ImgOps | https://imgops.com/#b#`;
                         };
 
                         if(src!=self.lastLoading)return;
+                        let img = this;
 
                         if(e.type=='error'){
-                            loadingIndicator.style.display='';
+                            if (loadingIndicator && loadingIndicator.style) loadingIndicator.style.display='';
                             self.errorSpan=ele;
                             if(preImgR)preImgR.abort();
-                            self.loadImg(this,ele,true);
+                            self.loadImg(img, ele,true);
                         };
 
                         self.slideShow.run('loadEnd');
@@ -15022,28 +17367,51 @@ ImgOps | https://imgops.com/#b#`;
                 });
 
                 this.imgReady.removeLI=function(){
-                    loadingIndicator.style.display='';
+                    if (loadingIndicator && loadingIndicator.style) loadingIndicator.style.display='';
                 };
 
             },
             loadImg:function(img,relatedThumb,error){
-                if(img.nodeName!='IMG'){//先读取。
+                [].forEach.call(this.eleMaps['img-parent'].querySelectorAll("[id^=vjs_video]"), video => {
+                    video.parentNode.removeChild(video);
+                });
+                if(!/^(img|video|audio)$/i.test(img.nodeName)){//先读取。
                     this.getImg(img);
                     return;
-                };
+                }
 
-                if(this.img){
+                if(this.img && this.img.parentNode){
                     this.img.parentNode.removeChild(this.img);
-                };
+                }
 
-                var imgNaturalSize={
-                    h:img.naturalHeight,
-                    w:img.naturalWidth,
-                };
+                var imgNaturalSize;
+                if (/^video$/i.test(img.nodeName)) {
+                    imgNaturalSize = {
+                        h:img.videoHeight || 1080,
+                        w:img.videoWidth || 1920,
+                    };
+                } else if (/^audio$/i.test(img.nodeName)) {
+                    imgNaturalSize = {
+                        h:50,
+                        w:350,
+                    };
+                } else {
+                    imgNaturalSize={
+                        h:img.naturalHeight || 100,
+                        w:img.naturalWidth || 100,
+                    };
+                }
                 this.imgNaturalSize=imgNaturalSize;
 
                 this.eleMaps['head-left-img-info-resolution'].textContent=imgNaturalSize.w + ' x ' + imgNaturalSize.h;
+                updateGalleryHeaderSize(this, img, 'auto');
                 var thumbnails=this.eleMaps['sidebar-thumbnails-container'].childNodes,i=0;
+                thumbnails=Array.prototype.slice.call(thumbnails).filter(function(thumbnail){
+                    if(thumbnail.style.display=="none"){
+                        return false;
+                    }
+                    return true;
+                });
                 while(thumbnails[i]!=relatedThumb && i<thumbnails.length)i++;
                 if(i<thumbnails.length)this.eleMaps['head-left-img-info-count'].textContent="（"+(i+1)+" / "+thumbnails.length+"）";
                 // 加上图片的注释
@@ -15055,13 +17423,18 @@ ImgOps | https://imgops.com/#b#`;
                 description;
 
                 this.img=img;
-                this.img.title=description;
+                //this.img.title=description;
                 this.src=img.src;
                 this.isLoading=false;
 
                 this.relatedThumb=relatedThumb;
                 img.className='pv-gallery-img';
+                var thumb = dataset(relatedThumb, 'thumbSrc');
+                if (thumb) {
+                    img.style.backgroundImage = `url(${thumb})`;
+                }
 
+                var self=this;
                 if(error){
                     let relatedImg=relatedThumb.querySelector("img");
                     if(!relatedImg)return;
@@ -15069,17 +17442,29 @@ ImgOps | https://imgops.com/#b#`;
                         this.imgError=true;
                         this.img.style.display='none';
                         this.eleMaps['img_broken'].style.display='inline-block';
+                        this.eleMaps['head-left-img-info-size'].textContent='';
+                        dataset(relatedThumb,'naturalSize',JSON.stringify({w: 0, h: 0}));
                     }else{
                         var srcs=dataset(relatedThumb, 'srcs');
                         if(srcs && srcs.length>0)srcs=srcs.split(",");
-                        var self=this;
                         this.img.onload=function(){
-                            var imgNaturalSize={
+                            imgNaturalSize={
                                 h:this.naturalHeight,
                                 w:this.naturalWidth,
                             };
 
                             self.imgNaturalSize=imgNaturalSize;
+                            self.eleMaps['head-left-img-info-resolution'].textContent=imgNaturalSize.w + ' x ' + imgNaturalSize.h;
+                            updateGalleryHeaderSize(self, this, 'auto');
+                            dataset(relatedThumb,'naturalSize',JSON.stringify(imgNaturalSize));
+                            let key = imgNaturalSize.w + "x" + imgNaturalSize.h;
+                            self.sizeMap[key] = (self.sizeMap[key] || 0) + 1;
+                            if (self.sizeMap[key] === 2) {
+                                let option = document.createElement("option");
+                                option.innerText = key;
+                                option.value = imgNaturalSize.w + "-" + imgNaturalSize.w + "x" + imgNaturalSize.h + "-" + imgNaturalSize.h;
+                                self.pinSize.appendChild(option);
+                            }
                             self.fitToScreen();
                         }
                         if(srcs && srcs.length>0){
@@ -15087,10 +17472,6 @@ ImgOps | https://imgops.com/#b#`;
                             dataset(relatedThumb, 'srcs',srcs.join(","));
                             if(src){
                                 dataset(relatedThumb, 'src',src);
-                                this.img.onerror=function(e){
-                                    this.src=relatedImg.src;
-                                    dataset(relatedThumb, 'src',this.src);
-                                }
                                 this.img.src=src;
                             }
                         }
@@ -15101,12 +17482,19 @@ ImgOps | https://imgops.com/#b#`;
                     this.eleMaps['img_broken'].style.display='';
                     if(!dataset(relatedThumb,'naturalSize')){
                         dataset(relatedThumb,'naturalSize',JSON.stringify(imgNaturalSize));
+                        let key = imgNaturalSize.w + "x" + imgNaturalSize.h;
+                        self.sizeMap[key] = (self.sizeMap[key] || 0) + 1;
+                        if (self.sizeMap[key] === 2) {
+                            let option = document.createElement("option");
+                            option.innerText = key;
+                            option.value = imgNaturalSize.w + "-" + imgNaturalSize.w + "x" + imgNaturalSize.h + "-" + imgNaturalSize.h;
+                            self.pinSize.appendChild(option);
+                        }
                     };
                 };
 
                 function styled(){
                     img.style.opacity=1;
-                    img.style[support.cssTransform]='scale(1)';
                 };
 
 
@@ -15133,7 +17521,7 @@ ImgOps | https://imgops.com/#b#`;
 
             },
             fitToScreen:function(scale){
-
+                this.rotateBigImg();
                 var container=this.eleMaps['img-content'];
                 var containerSize={
                     h:container.clientHeight,
@@ -15142,66 +17530,158 @@ ImgOps | https://imgops.com/#b#`;
 
                 var img=this.img;
 
-                if(!img || !img.classList)return;
+                if(!img || !img.classList || !img.parentNode)return;
                 img.classList.remove('pv-gallery-img_zoom-in');
                 img.classList.remove('pv-gallery-img_zoom-out');
 
                 var imgSty=img.style;
                 imgSty.width='';
                 imgSty.height='';
+                var imgPaSty=img.parentNode.style;
+                imgPaSty.width='';
+                imgPaSty.height='';
+                imgPaSty=this.eleMaps['img-parent'].style;
 
+                let rotate90 = this.galleryRotate == 90 || this.galleryRotate == 270;
+                let imgNaturalSize = rotate90 ? {w: this.imgNaturalSize.h, h: this.imgNaturalSize.w} : this.imgNaturalSize;
                 var contentSSize={
                     h:container.scrollHeight,
                     w:container.scrollWidth,
                 };
                 var larger=contentSSize.h>containerSize.h || contentSSize.w>containerSize.w;
+                if (rotate90 && larger) {
+                    if (imgNaturalSize.h < containerSize.h && imgNaturalSize.w < containerSize.w) larger = false;
+                }
 
                 var scaled='100%';
 
-                if(this.fitContains && !(scale && scale.x==0 && scale.y==0 && this.imgNaturalSize.h/this.imgNaturalSize.w > 2.5)){//适应屏幕
+                var noResize = false;
+                if(this.fitContains && !(scale && scale.x==0 && scale.y==0 && imgNaturalSize.h/imgNaturalSize.w > 2.5)){//适应屏幕
+                    this.scaleByScreen = false;
                     this.imgScrollbarV.hide();
                     this.imgScrollbarH.hide();
                     if(larger){
                         img.classList.add('pv-gallery-img_zoom-in');
-                        if(contentSSize.h/contentSSize.w >=containerSize.h/containerSize.w){
-                            let height=this.imgNaturalSize.h-(contentSSize.h - containerSize.h);
-                            imgSty.height=height + 'px';
-                            imgSty.setProperty('height', height+'px', 'important');
-                            scaled=height/this.imgNaturalSize.h;
+                        if(contentSSize.h/contentSSize.w >= containerSize.h/containerSize.w){
+                            let height=containerSize.h - 10;
+                            if (rotate90) {
+                                imgSty.width=height + 'px';
+                                imgSty.setProperty('width', height+'px', 'important');
+                            } else {
+                                imgSty.height=height + 'px';
+                                imgSty.setProperty('height', height+'px', 'important');
+                            }
+                            imgPaSty.height=height + 'px';
+                            imgPaSty.setProperty('height', height+'px', 'important');
+                            scaled=height/imgNaturalSize.h;
                         }else{
-                            let width=this.imgNaturalSize.w-(contentSSize.w - containerSize.w);
-                            imgSty.width=width + 'px';
-                            imgSty.setProperty('width', width+'px', 'important');
-                            scaled=width/this.imgNaturalSize.w;
+                            let width=containerSize.w - 10;
+                            if (rotate90) {
+                                imgSty.height=width + 'px';
+                                imgSty.setProperty('height', width+'px', 'important');
+                            } else {
+                                imgSty.width=width + 'px';
+                                imgSty.setProperty('width', width+'px', 'important');
+                            }
+                            imgPaSty.width=width + 'px';
+                            imgPaSty.setProperty('width', width+'px', 'important');
+                            scaled=width/imgNaturalSize.w;
                         };
                         scaled=(scaled*100).toFixed(2) + '%';
                     }else if(prefs.gallery.fitToScreenSmall){
-                        if(this.imgNaturalSize.h/this.imgNaturalSize.w >=containerSize.h/containerSize.w){
-                            let height=contentSSize.h-50;
+                        if(imgNaturalSize.h/imgNaturalSize.w >= containerSize.h/containerSize.w){
+                            let height=contentSSize.h-10;
                             height=height<0?contentSSize.h:height;
-                            imgSty.height=height + 'px';
-                            scaled=height/this.imgNaturalSize.h;
+                            if (rotate90) {
+                                imgSty.width=height + 'px';
+                                imgSty.setProperty('width', height+'px', 'important');
+                            } else {
+                                imgSty.height=height + 'px';
+                                imgSty.setProperty('height', height+'px', 'important');
+                            }
+                            imgPaSty.height=height + 'px';
+                            imgPaSty.setProperty('height', height+'px', 'important');
+                            scaled=height/imgNaturalSize.h;
                         }else{
-                            let width=contentSSize.w-50;
+                            let width=contentSSize.w-10;
                             width=width<0?contentSSize.w:width;
-                            imgSty.width=width + 'px';
-                            scaled=width/this.imgNaturalSize.w;
+                            if (rotate90) {
+                                imgSty.height=width + 'px';
+                                imgSty.setProperty('height', width+'px', 'important');
+                            } else {
+                                imgSty.width=width + 'px';
+                                imgSty.setProperty('width', width+'px', 'important');
+                            }
+                            imgPaSty.width=width + 'px';
+                            imgPaSty.setProperty('width', width+'px', 'important');
+                            scaled=width/imgNaturalSize.w;
                         };
                         scaled=(scaled*100).toFixed(2) + '%';
                     }
-                }else{//不做尺寸调整
+                }else{
+                    noResize = true;
+                }
+                if (imgSty.width == '' && imgSty.height == "" && this.imgNaturalSize.h && this.imgNaturalSize.w) {
+                    let imgW = this.imgNaturalSize.w + 'px';
+                    let imgH = this.imgNaturalSize.h + 'px';
+                    let imgPaW = imgNaturalSize.w + 'px';
+                    let imgPaH = imgNaturalSize.h + 'px';
+                    if (containerSize.h < imgNaturalSize.h && containerSize.w < imgNaturalSize.w) {
+                        if (this.scaleByScreen) {
+                            this.scaleByScreen = false;
+                        } else {
+                            this.scaleByScreen = true;
+                            img.classList.add('pv-gallery-img_zoom-in');
+                            if (imgNaturalSize.h / imgNaturalSize.w >= containerSize.h / containerSize.w) {
+                                let fitWidth = containerSize.w - 10;
+                                let fitHeight = imgNaturalSize.h / imgNaturalSize.w * fitWidth;
+                                if (rotate90) {
+                                    imgH = fitWidth + "px";
+                                    imgW = fitHeight + "px";
+                                    imgPaW = imgH;
+                                    imgPaH = imgW;
+                                } else {
+                                    imgW = fitWidth + "px";
+                                    imgH = fitHeight + "px";
+                                    imgPaW = imgW;
+                                    imgPaH = imgH;
+                                }
+                            } else {
+                                let fitHeight = containerSize.h - 10;
+                                let fitWidth = imgNaturalSize.w / imgNaturalSize.h * fitHeight;
+                                if (rotate90) {
+                                    imgW = fitHeight + "px";
+                                    imgH = fitWidth + "px";
+                                    imgPaW = imgH;
+                                    imgPaH = imgW;
+                                } else {
+                                    imgH = fitHeight + "px";
+                                    imgW = fitWidth + "px";
+                                    imgPaW = imgW;
+                                    imgPaH = imgH;
+                                }
+                            }
+                        }
+                    }
+                    imgSty.width = imgW;
+                    imgSty.height = imgH;
+                    imgPaSty.width = imgPaW;
+                    imgPaSty.height = imgPaH;
+                }
+                if (noResize) {
                     this.imgScrollbarV.reset();
                     this.imgScrollbarH.reset();
 
                     if(larger){
-                        img.classList.add('pv-gallery-img_zoom-out');
+                        if (!this.scaleByScreen) {
+                            img.classList.add('pv-gallery-img_zoom-out');
+                        }
                         if(scale){//通过鼠标点击进行的切换。
                             this.imgScrollbarH.scroll(container.scrollWidth * scale.x - containerSize.w/2);
                             this.imgScrollbarV.scroll(container.scrollHeight * scale.y - containerSize.h/2);
                         };
                     };
-                };
-
+                }
 
                 var imgScaledInfo=this.eleMaps['head-left-img-info-scaling'];
                 imgScaledInfo.textContent='（'+scaled+'）';
@@ -15209,88 +17689,173 @@ ImgOps | https://imgops.com/#b#`;
                     imgScaledInfo.style.color='#E9CCCC';
                 }else{
                     imgScaledInfo.style.color='';
-                };
+                }
 
             },
 
             _dataCache: {},
             _spanMarkPool: {},
-            _appendThumbSpans: function(data, index) {  // 添加缩略图栏的 spans
+            filterImage: function(itemW, itemH, src) {
+                if (!itemW || !itemH) return true;
+                if (itemW < this.sizeInputW.value || itemH < this.sizeInputH.value) {
+                    return false;
+                }
+                if (this.urlFilter && src) {
+                    src = src.replace(/^(data:[^;]*;).*/, "$1");
+                    if (!this.urlFilterReg) {
+                        try {
+                            this.urlFilterReg = new RegExp(this.urlFilter);
+                        } catch(e) {}
+                    }
+                    if (this.urlFilterReg && !this.urlFilterReg.test(src)) {
+                        return false;
+                    }
+                }
+                if (this.lockMaxSize && (itemW > this.lockMaxSize.w || itemH > this.lockMaxSize.h)) {
+                    return false;
+                }
+                return true;
+            },
+            getSrcBySpanMark: function(spanMark) {
+                let pool = this._spanMarkPool;
+                return Object.keys(pool).find(key => pool[key] === spanMark);
+            },
+            getPropBySpanMark: function(spanMark, key) {
+                let src = this.getSrcBySpanMark(spanMark);
+                if (!src) return;
+                for (let i = 0; i < this.data.length; i++) {
+                    if (this.data[i].src == src) {
+                        return key ? this.data[i][key] : this.data[i];
+                    }
+                }
+                return;
+            },
+            _appendThumbSpans: function(data, index) { // 添加缩略图栏的 spans
                 var iStatisCopy = this.iStatisCopy;
 
-                if (typeof index == 'undefined' && this.selected) {
-                    index = Array.prototype.slice.call(this.imgSpans).indexOf(this.selected);
+                if (typeof index == 'undefined') {
+                    if (this.selected) {
+                        index = Array.prototype.slice.call(this.imgSpans).indexOf(this.selected);
+                    } else index = 0;
                 }
 
-                var sizeInputH=this.gallery.querySelector("#minsizeH");
-                var sizeInputW=this.gallery.querySelector("#minsizeW");
+                var sizeInputH=this.sizeInputH;
+                var sizeInputW=this.sizeInputW;
                 var thumbnails=this.eleMaps['sidebar-thumbnails-container'];
-                var selectData;
+                var selectData, selectSpan;
+                if (index != -1) {
+                    selectData = this.data[index];
+                }
                 // 如果是新的，则添加，否则重置并添加。
                 if (!data){
-                    selectData=this.data[index];
                     if(selectData){
-                        let spanMark=this._spanMarkPool[selectData.imgSrc];
-                        if(spanMark && spanMark.dataset.naturalSize){
-                            let naturalSize=JSON.parse(spanMark.dataset.naturalSize);
-                            selectData.sizeW=naturalSize.w;
-                            selectData.sizeH=naturalSize.h;
-                        }
+                        let spanMark=this._spanMarkPool[selectData.src];
                         if(selectData.sizeW<sizeInputW.value){
                             var sizeInputWSpan=this.gallery.querySelector("#minsizeWSpan");
                             sizeInputW.value=selectData.sizeW;
-                            sizeInputW.title=sizeInputW.value+"px";
-                            sizeInputWSpan.innerHTML=createHTML(Math.floor(sizeInputW.value)+"px");
+                            sizeInputW.title="min width: "+sizeInputW.value+"px";
+                            setHTML(sizeInputWSpan, "W: "+Math.floor(sizeInputW.value)+"px");
                         }
                         if(selectData.sizeH<sizeInputH.value){
                             var sizeInputHSpan=this.gallery.querySelector("#minsizeHSpan");
                             sizeInputH.value=selectData.sizeH;
-                            sizeInputH.title=sizeInputH.value+"px";
-                            sizeInputHSpan.innerHTML=createHTML(Math.floor(sizeInputH.value)+"px");
+                            sizeInputH.title="min height: "+sizeInputH.value+"px";
+                            setHTML(sizeInputHSpan, "H: "+Math.floor(sizeInputH.value)+"px");
                         }
                     }
-                    thumbnails.innerHTML = createHTML("");
+                    setHTML(thumbnails, "");
                     this._dataCache = {};
-                    this.eleMaps['maximize-container'].innerHTML = createHTML("");
+                    setHTML(this.eleMaps['maximize-container'], "");
                 }
-                var self=this;
-                (data || this.data).forEach(function(item) {
-                    if(!item || !item.type)return;
-                    iStatisCopy[item.type].count++;
-                    var spanMark=self._spanMarkPool[item.imgSrc];
+                var self = this;
+                var createSpanMark = item => {
+                    var spanMark=self._spanMarkPool[item.src];
                     if(!spanMark){
                         spanMark = document.createElement("span");
                         try{
+                            if (item.noActual && item.img && item.img.naturalHeight && item.img.naturalWidth) {
+                                spanMark.dataset.naturalSize = JSON.stringify({
+                                    h: item.img.naturalHeight,
+                                    w: item.img.naturalWidth,
+                                });
+                                let key = item.img.naturalWidth + "x" + item.img.naturalHeight;
+                                self.sizeMap[key] = (self.sizeMap[key] || 0) + 1;
+                                if (self.sizeMap[key] === 2) {
+                                    let option = document.createElement("option");
+                                    option.innerText = key;
+                                    option.value = item.img.naturalWidth + "-" + item.img.naturalWidth + "x" + item.img.naturalHeight + "-" + item.img.naturalHeight;
+                                    self.pinSize.appendChild(option);
+                                }
+                            }
                             spanMark.className="pv-gallery-sidebar-thumb-container";
+                            spanMark.dataset.index=index;
                             spanMark.dataset.type=item.type;
                             spanMark.dataset.src=item.src;
-                            spanMark.dataset.srcs=item.srcs||"";
-                            if(item.xhr)spanMark.dataset.xhr=encodeURIComponent(JSON.stringify(item.xhr));
-                            spanMark.dataset.description=encodeURIComponent(item.description || '');
-                            spanMark.dataset.thumbSrc=item.imgSrc;
-                            spanMark.title=(item.img?(item.img.title||item.img.alt||""):"");
-                            spanMark.innerHTML=createHTML('<span class="pv-gallery-vertical-align-helper"></span>' +
+                            spanMark.dataset.srcs=item.srcs?item.srcs.join(","):"";
+                            //if(item.xhr)spanMark.dataset.xhr=encodeURIComponent(JSON.stringify(item.xhr));
+                            spanMark.dataset.description=encodeURIComponent(item.description || (item.img ? (item.img.title || item.img.alt || "") : ""));
+                            spanMark.dataset.thumbSrc=(item.img && (item.img.currentSrc || item.img.src)) || item.imgSrc;
+                            let title = item.img ? (item.img.title || item.img.alt || "").slice(-200) : "";
+                            if (title) {
+                                if (title.indexOf('http') === 0 || title.indexOf('data') === 0) title = '';
+                                else title += '\n';
+                            }
+                            let itemSrc = item.src.replace(/^blob:.*/, "").replace(/^(data[^;]+).*/, "$1...");
+                            spanMark.title = title + (itemSrc.length > 150 ? itemSrc.slice(0, 110) + " ... " + itemSrc.slice(-30) : itemSrc);
+                            setHTML(spanMark, '<span class="pv-gallery-vertical-align-helper"></span>' +
                                 '<span class="pv-gallery-sidebar-thumb-loading" title="'+i18n("loading")+'......"></span>');
+                            spanMark.addEventListener('contextmenu', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                spanMark.classList.toggle("ignore");
+                                if ((e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) && self.lastMark && self.lastMark !== spanMark && self.lastMark.parentNode === spanMark.parentNode) {
+                                    const children = Array.from(thumbnails.children);
+                                    let current;
+                                    if (children.indexOf(self.lastMark) < children.indexOf(spanMark)) {
+                                        current = self.lastMark.nextElementSibling;
+                                    } else {
+                                        current = spanMark.nextElementSibling;
+                                    }
+                                    while (current !== null && current !== self.lastMark && current !== spanMark) {
+                                        current.classList.toggle("ignore");
+                                        current = current.nextElementSibling;
+                                    }
+                                }
+                                self.lastMark = spanMark;
+                            });
                         }catch(e){};
-                        self._spanMarkPool[item.imgSrc] = spanMark;
+                        self._spanMarkPool[item.src] = spanMark;
                     }
+                    //spanMark.dataset.xhr='';
                     if(spanMark.dataset.naturalSize){
                         let naturalSize=JSON.parse(spanMark.dataset.naturalSize);
                         item.sizeW=naturalSize.w;
                         item.sizeH=naturalSize.h;
                     }
-                    if(item.sizeW<sizeInputW.value || item.sizeH<sizeInputH.value){
+                    if (item.sizeW == 0 && item.sizeH == 0 && item.img.complete) {
                         spanMark.style.display="none";
-                    }else{
+                    } else if (!this.filterImage(item.sizeW, item.sizeH, item.src)){
+                        spanMark.style.display="none";
+                    } else {
                         spanMark.style.display="";
                     }
                     thumbnails.appendChild(spanMark);
                     self.addViewmoreItem([spanMark]);
+                    if (!selectSpan && selectData && (item.src == selectData.src || (item.img && item.img == selectData.img))) {
+                        selectSpan = spanMark;
+                        self.select(selectSpan, true);
+                    }
+                };
+                var self=this;
+                (data || this.data).forEach(function(item) {
+                    if(!item || !item.type)return;
+                    iStatisCopy[item.type].count++;
+                    createSpanMark(item);
                 });
 
                 (data || this.data).forEach(function(d) {
                     if(!d)return;
-                    self._dataCache[d.imgSrc] = true;
+                    self._dataCache[d.src] = true;
                 });
 
                 //写入类别数据。
@@ -15317,8 +17882,9 @@ ImgOps | https://imgops.com/#b#`;
                 this.imgSpans = thumbnails.children;
 
                 this.thumbScrollbar.reset();
+                this.bricksInstance.pack();
 
-                if(!this.imgSpans[index] || (this.imgSpans[index].style.display=="none" && !selectData)){
+                if(!data && (!selectSpan || (selectSpan.style.display=="none" && !selectData))){
                     for(var j in this.imgSpans){
                         if (!this.imgSpans.hasOwnProperty(j)) continue;
                         var curSpan=this.imgSpans[j];
@@ -15327,8 +17893,9 @@ ImgOps | https://imgops.com/#b#`;
                             return;
                         }
                     }
+                    if(!selectSpan && this.imgSpans.length)selectSpan=this.imgSpans[0];
                 }
-                this.select(this.imgSpans[index], true);
+                this.select(selectSpan, true);
             },
             load:function(data, from, reload){
                 if(this.shown || this.minimized){//只允许打开一个,请先关掉当前已经打开的库
@@ -15360,9 +17927,10 @@ ImgOps | https://imgops.com/#b#`;
                     },true);
                 };
 
-                var unique=this.unique(data);
-                data=unique.data;
-                var index=unique.index;
+                var hasTarget = !!data.target;
+                var unique = this.unique(data);
+                data = unique.data;
+                var index = hasTarget ? unique.index : -1;
 
                 if (reload && this.data.length >= data.length) {
                     // alert('没有新增的图片');
@@ -15376,6 +17944,18 @@ ImgOps | https://imgops.com/#b#`;
                 this.from=from;//如果来自frame，那么这个from应该保存了那个frame的窗口id，便于以后通信。
 
                 this._appendThumbSpans(null, index);
+                if (this.urlFilter) {
+                    var thumbnails = this.eleMaps['sidebar-thumbnails-container'].childNodes;
+                    thumbnails = Array.prototype.slice.call(thumbnails).filter(function(thumbnail) {
+                        if (thumbnail.style.display == "none") {
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (thumbnails.length === 0) {
+                        this.showTips("No images match the filter");
+                    }
+                }
 
                 this.runOnce();
 
@@ -15383,7 +17963,13 @@ ImgOps | https://imgops.com/#b#`;
 
                 var pageObj = this.getPage(),textSpan = this.eleMaps['head-command-nextPage'].querySelector("span");
                 this.haveMorePage = !!pageObj.pre || !!pageObj.next;
-                textSpan.style.color=this.haveMorePage?"#e9cccc":"";
+                if (this.haveMorePage) {
+                    textSpan.style.color="#e9cccc";
+                    textSpan.parentNode.parentNode.style.display="inline-block";
+                } else {
+                    textSpan.style.color="";
+                    textSpan.parentNode.parentNode.style.display="none";
+                }
             },
             haveMorePage:false,
             clear:function(){
@@ -15403,8 +17989,9 @@ ImgOps | https://imgops.com/#b#`;
                 //读取错误的图片占位符
                 this.eleMaps['img_broken'].style.display='';
                 //清空dom
-                this.eleMaps['sidebar-thumbnails-container'].innerHTML=createHTML('');
+                setHTML(this.eleMaps['sidebar-thumbnails-container'], '');
                 this.eleMaps['head-left-img-info-resolution'].textContent='0 x 0';
+                this.eleMaps['head-left-img-info-size'].textContent='';
                 this.eleMaps['head-left-img-info-count'].textContent='（1 / 1）';
                 this.eleMaps['head-left-img-info-scaling'].textContent='（100%）';
                 //隐藏滚动条
@@ -15416,9 +18003,9 @@ ImgOps | https://imgops.com/#b#`;
             },
 
             unique:function(data){
-                var imgSrc;
+                var targetSrc;
                 if(data.target){
-                    imgSrc=data.target.src;
+                    targetSrc=data.target.src;
                 }
 
                 var data_i,
@@ -15430,23 +18017,29 @@ ImgOps | https://imgops.com/#b#`;
                 for(var i=0,ii=data.length;i<ii;i++){
                     data_i=data[i];
                     data_i_src=data_i.src;
+                    if (i + 1 < ii && data_i.img && data_i.img.nodeName != 'IMG' && data_i_src == data[i + 1].src) {
+                        data.splice(i, 1);
+                        i--;
+                        ii--;
+                        continue;
+                    }
                     if(dataSrcs.indexOf(data_i_src)!=-1){//已经存在
                         data.splice(i,1);//移除
                         i--;
                         ii--;
                         continue;
-                    };
+                    }
                     dataSrcs.push(data_i_src);
 
-                    if(imgSrc==data_i_src){
+                    if(targetSrc==data_i_src){
                         index=i;
-                    };
+                    }
                 };
 
                 if(typeof index =='undefined'){
                     index=0;
-                    data.unshift(data.target);
-                };
+                    if (data.target) data.unshift(data.target);
+                }
 
                 delete data.target;
 
@@ -15465,8 +18058,11 @@ ImgOps | https://imgops.com/#b#`;
                 }
             },
             keyUpListener:function(e){
-                switch(e.keyCode){
-                    case 82:
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                const key = e.key || String.fromCharCode(e.keyCode);
+                if (e.target != this.gallery) return;
+                switch(key.toLowerCase()){
+                    case 'r':
                         var img=this.img;
                         var cssTransform=img.style[support.cssTransform];
                         var iTransform=cssTransform.replace(/rotate\([^)]*\)/i,'');
@@ -15478,10 +18074,25 @@ ImgOps | https://imgops.com/#b#`;
                         }
                         img.style[support.cssTransform] = ' rotate('+ origin +'rad) ' + iTransform;
                         break;
+                    case prefs.floatBar.keys.actual:
+                    case prefs.floatBar.keys.current:
+                        if (e.shiftKey) return;
+                        const data = this.getPropBySpanMark(this.selected);
+                        imgReady(this.src,{
+                            ready:function(){
+                                new ImgWindowC(this, {...data, src: this.src});
+                            },
+                        });
+                        break;
+                    case prefs.floatBar.keys.download:
+                        if (e.shiftKey) return;
+                        downloadImg(this.img.src, this.selected.title, prefs.saveName, null, this.getPropBySpanMark(this.selected));
+                        break;
                 }
             },
             show:function(reload){
                 this.shown=true;
+                this.addStyle();
                 galleryMode=true;
 
                 if (!reload) {
@@ -15506,12 +18117,18 @@ ImgOps | https://imgops.com/#b#`;
 
                 var self=this;
                 if(prefs.gallery.autoOpenViewmore){
+                    var toggleBar = this.eleMaps['sidebar-toggle'];
                     setTimeout(function(){
-                        self.maximizeSidebar();
+                        var alreadyShow = toggleBar.style.visibility == 'hidden';
+                        if (!alreadyShow) {
+                            self.maximizeSidebar();
+                        }
                     },1);
                 }
             },
             close:function(reload){
+                if(this.lockGallery)return;
+                if(this.img && this.img.parentNode) this.img.parentNode.removeChild(this.img);
                 if(this.hideBodyStyle.parentNode)
                     this.hideBodyStyle.parentNode.removeChild(this.hideBodyStyle);
                 document.removeEventListener('keydown',this._keyDownListener,true);
@@ -15524,8 +18141,10 @@ ImgOps | https://imgops.com/#b#`;
                     this.gallery.blur();
                     this.gallery.style.display='none';
                     var des=document.documentElement.style;
-                    des.overflowX=this.deOverflow.x;
-                    des.overflowY=this.deOverflow.y;
+                    if(this.deOverflow){
+                        des.overflowX=this.deOverflow.x;
+                        des.overflowY=this.deOverflow.y;
+                    }
                     this.slideShow.exit();
                     this.collection.exit();
                     window.removeEventListener('resize',this._resizeHandler,true);
@@ -15560,11 +18179,13 @@ ImgOps | https://imgops.com/#b#`;
                     curPage.querySelector("a#prev")||
                     curPage.querySelector("a#leftFix")||
                     curPage.querySelector("a.prev_page")||
+                    curPage.querySelector(".prev-page>a")||
                     curPage.querySelector(".prev>a");
                 let next=curPage.querySelector("a.next")||
                     curPage.querySelector("a#next")||
                     curPage.querySelector("a#rightFix")||
                     curPage.querySelector("a.next_page")||
+                    curPage.querySelector(".next-page>a")||
                     curPage.querySelector(".next>a");
                 if(!pre && !next){
                     let pageDiv=curPage.querySelector("div.wp-pagenavi");
@@ -15591,7 +18212,7 @@ ImgOps | https://imgops.com/#b#`;
                             if(!aTag.href || /javascript:/.test(aTag.href.trim()))continue;
                             if(pref && pres && pret)break;
                             if(!pref){
-                                if(/(\s|^)上[一1]?[页頁张張]|^previous( page)?\s*$|前のページ/i.test(aTag.innerHTML)){
+                                if(/(\s|^)上[一1]?[页頁张張话話章]|^previous( page)?\s*$|前のページ/i.test(aTag.innerHTML)){
                                     pref=aTag;
                                 }
                             }
@@ -15621,7 +18242,7 @@ ImgOps | https://imgops.com/#b#`;
                             if(!aTag.href || /^\s*javascript:/.test(aTag.href.trim()))continue;
                             if(nextf && nexts && nextt)break;
                             if(!nextf){
-                                if(/(\s|^)下[一1]?[页頁张張]|^next( page)?\s*$|次のページ/i.test(aTag.innerHTML)){
+                                if(/(\s|^)下[一1]?[页頁张張话話章]|^next( page)?\s*$|次のページ/i.test(aTag.innerHTML)){
                                     nextf=aTag;
                                 }
                             }
@@ -15637,6 +18258,13 @@ ImgOps | https://imgops.com/#b#`;
                                     nextt=aTag;
                                 }else if(aTag.href.indexOf(this.href)!=-1 && /^[\/\?&]?[_-]?(p|page)?=?[12]\/?(\?|&|$)/i.test(aTag.href.replace(this.href,""))){
                                     nextt=aTag;
+                                }else{
+                                    let prevEle = aTag.previousElementSibling;
+                                    if (prevEle && (prevEle.nodeName == 'B' || prevEle.nodeName == 'SPAN')) {
+                                        if (/^\d+$/.test(aTag.innerText) && parseInt(aTag.innerText) == parseInt(prevEle.innerText) + 1) {
+                                            nextt = aTag;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -15647,21 +18275,6 @@ ImgOps | https://imgops.com/#b#`;
                 if(!next)next=curPage.querySelector('[rel="next"]');
                 return {pre:pre,next:next};
             },
-            canonicalUri:function(src){
-                if(src.charAt(0)=="#")return location.href+src;
-                var root_page = /^[^?#]*\//.exec(location.href)[0],
-                    base_path = location.pathname.replace(/\/[^\/]+\.[^\/]+$/, "/"),
-                    root_domain = /^\w+\:\/\/\/?[^\/]+/.exec(root_page)[0],
-                    absolute_regex = /^\w+\:\/\//;
-                src=src.replace(/\.\//,"");
-                if (/^\/\/\/?/.test(src)){
-                    src = location.protocol + src;
-                }
-                else if (!absolute_regex.test(src) && src.charAt(0) != "/"){
-                    src = (base_path || "") + src;
-                }
-                return (absolute_regex.test(src) ? src : ((src.charAt(0) == "/" ? root_domain : root_page) + src));
-            },
             completePages:[location.href],
             href:location.href,
             pageAllReady:false,
@@ -15669,10 +18282,13 @@ ImgOps | https://imgops.com/#b#`;
             loadingImgs:[],
             pageImgReady:function(){
                 var textSpan=this.eleMaps['head-command-nextPage'].querySelector("span");
-                if(this.pageAllReady && this.loadingImgNum<=0){
-                    textSpan.innerHTML=createHTML("<font color='red'>"+i18n("loadedAll")+"</font>");
-                    setTimeout(function(){textSpan.innerHTML=createHTML(i18n("loadAll"));},1500);
-                }
+                clearTimeout(this.readyTimeout);
+                this.readyTimeout = setTimeout(() => {
+                    if(this.pageAllReady && this.loadingImgNum<=0){
+                        setHTML(textSpan, "<font color='red'>"+i18n("loadedAll")+"</font>");
+                        setTimeout(function(){setHTML(textSpan, i18n("loadAll"));},1500);
+                    }
+                }, 1100);
             },
             pageAction:function(next, single){
                 var pageObj=this.getPage(),self=this,textSpan=this.eleMaps['head-command-nextPage'].querySelector("span");
@@ -15694,13 +18310,13 @@ ImgOps | https://imgops.com/#b#`;
                     return;
                 }
                 var targetUrl=next?pageObj.next:pageObj.pre;
-                if(targetUrl.tagName!="A"){
+                if(targetUrl.nodeName!="A"){
                     var childA=targetUrl.querySelector("a");
                     if(childA){
                         targetUrl=childA;
                     }else{
                         while(targetUrl=targetUrl.parentElement){
-                            if(targetUrl.nodeName=='A'){
+                            if(targetUrl.nodeName.toUpperCase()=='A'){
                                 break;
                             }
                         }
@@ -15714,24 +18330,46 @@ ImgOps | https://imgops.com/#b#`;
                 }else{
                     self.completePages.push(href);
                 }
-                self.href=self.canonicalUri(href);
+                self.href = canonicalUri(href);
+                self.addPageImages(self.href, html => {
+                    if (html) {
+                        self.curPage = html;
+                    }
+                    if (prefs.gallery.loadAll && !single) {
+                        setTimeout(() => {
+                            self.pageAction(next);
+                        }, 1);
+                    } else loadOver();
+                }, true);
+            },
+            addPageImages: function(url, pageCb, checkReady) {
+                let self = this;
                 _GM_xmlhttpRequest({
                     method: 'GET',
-                    url: self.href,
-                    headers:{"Referer": + window.location.href},
+                    url: url,
+                    headers:{"Referer": + url},
+                    cookie: cookie,
                     overrideMimeType:"text/html;charset="+document.charset,
                     onload: function(d) {
-                        let html=document.implementation.createHTMLDocument('');
+                        let html = document.implementation.createHTMLDocument('');
                         html.documentElement.innerHTML = d.responseText;
-                        self.curPage=html;
-                        let imgs=html.querySelectorAll('img');
-                        var container = document.querySelector('.pv-gallery-container'),
+                        let imgs = html.querySelectorAll('img');
+                        let container = document.querySelector('.pv-gallery-container'),
                             preloadContainer = document.querySelector('.pv-gallery-preloaded-img-container');
+                        let base = html.querySelector("base");
+                        let basePath = base ? base.href : null;
                         imgs = Array.prototype.slice.call(imgs).filter(function(img){
                             if(container.contains(img) || (preloadContainer&&preloadContainer.contains(img))){
                                 return false;
                             }
-                            pretreatment(img);
+                            if (img.getAttribute && img.getAttribute("src")) {
+                                let srcAtt = img.getAttribute("src");
+                                if (srcAtt.indexOf("http") !== 0) {
+                                    srcAtt = canonicalUri(srcAtt, url, basePath);
+                                    img.setAttribute("src", srcAtt);
+                                }
+                            }
+                            pretreatment(img, true);
                             if(!img.src || (img.getAttribute && !img.getAttribute("src")))return false;
                             var isrc=img.src.trim();
                             if(!isrc)return false;
@@ -15746,27 +18384,81 @@ ImgOps | https://imgops.com/#b#`;
                             return false;
                         });
                         function loadImg(img){
+                            img.onerror = null;
                             var result = findPic(img);
-                            img.src = result.src;
-                            self.loadingImgNum++;
-                            setTimeout(()=>{
-                                imgReady(img,{
-                                    ready:function(){
-                                        result = findPic(img);
-                                        self.loadingImgNum--;
-                                        self.data.push(result);
-                                        self._appendThumbSpans([result]);
-                                        self.loadThumb();
-                                        self.pageImgReady();
+                            if (checkReady) self.loadingImgNum++;
+                            if (result.xhr) {
+                                xhrLoad.load({
+                                    url: result.src,
+                                    xhr: result.xhr,
+                                    cb: function(imgSrc, imgSrcs, caption, captions) {
+                                        if (imgSrc) {
+                                            imgReady(img,{
+                                                ready:function(){
+                                                    result = findPic(img);
+                                                    result.src = imgSrc;
+                                                    if (caption) result.description = caption;
+                                                    if (checkReady) self.loadingImgNum--;
+                                                    self.data.push(result);
+                                                    self._appendThumbSpans([result]);
+                                                    self.loadThumb();
+                                                    if (checkReady) self.pageImgReady();
+                                                },
+                                                error:function(){
+                                                    if (checkReady) self.loadingImgNum--;
+                                                    if (checkReady) self.pageImgReady();
+                                                }
+                                            });
+                                            if (imgSrcs && imgSrcs.length) {
+                                                let i = 0;
+                                                imgSrcs.forEach(src => {
+                                                    if (src == imgSrc) return;
+                                                    let img = document.createElement('img');
+                                                    img.src = src;
+                                                    let cap = captions && captions[i] ? captions[i] : caption;
+                                                    imgReady(img,{
+                                                        ready:function(){
+                                                            let result = findPic(img);
+                                                            if (cap) result.description = cap;
+                                                            self.data.push(result);
+                                                            self._appendThumbSpans([result]);
+                                                            self.loadThumb();
+                                                        }
+                                                    });
+                                                    i++;
+                                                })
+                                            }
+                                        } else {
+                                            if (checkReady) self.loadingImgNum--;
+                                            if (checkReady) self.pageImgReady();
+                                        }
                                     },
-                                    error:function(){
-                                        self.loadingImgNum--;
-                                        self.pageImgReady();
+                                    onerror: () => {
+                                        if (checkReady) self.loadingImgNum--;
+                                        if (checkReady) self.pageImgReady();
                                     }
                                 });
-                            },0);
+                            } else {
+                                img.src = result.src;
+                                setTimeout(()=>{
+                                    imgReady(img,{
+                                        ready:function(){
+                                            result = findPic(img);
+                                            if (checkReady) self.loadingImgNum--;
+                                            self.data.push(result);
+                                            self._appendThumbSpans([result]);
+                                            self.loadThumb();
+                                            if (checkReady) self.pageImgReady();
+                                        },
+                                        error:function(){
+                                            if (checkReady) self.loadingImgNum--;
+                                            if (checkReady) self.pageImgReady();
+                                        }
+                                    });
+                                },0);
+                            }
                             if(!preloadContainer)preloadContainer = document.querySelector('.pv-gallery-preloaded-img-container');
-                            preloadContainer.appendChild(img);
+                            preloadContainer&&preloadContainer.appendChild(img);
                         }
                         if(prefs.gallery.downloadGap > 0){
                             self.loadingImgs=self.loadingImgs.concat(imgs);
@@ -15776,6 +18468,7 @@ ImgOps | https://imgops.com/#b#`;
                                     if(!img){
                                         clearInterval(self.loadIntv);
                                         self.loadIntv=null;
+                                        self.changeSizeInputReset();
                                     }else loadImg(img);
                                 },prefs.gallery.downloadGap);
                             }
@@ -15784,16 +18477,15 @@ ImgOps | https://imgops.com/#b#`;
                                 loadImg(img);
                             });
                         }
-                        if(prefs.gallery.loadAll && !single)self.pageAction(next);
-                        else loadOver();
+                        pageCb && pageCb(html);
                     },
                     onerror: function(e) {
-                        if(prefs.gallery.loadAll && !single)self.pageAction(next);
-                        else loadOver();
+                        pageCb && pageCb(null);
                     }
                 });
             },
             runOnce:function(){//运行一次来获取某些数据。
+                if (!this.selected) return;
                 var thumbSpanCS=unsafeWindow.getComputedStyle(this.selected);
                 this.thumbSpanOuterSize=this.isHorizontal?
                     this.selected.offsetWidth + parseFloat(thumbSpanCS.marginLeft) + parseFloat(thumbSpanCS.marginRight) :
@@ -15868,15 +18560,23 @@ ImgOps | https://imgops.com/#b#`;
                 if (this.selected.clientWidth == 0) return false;
                 if (!span) return true;
 
-                var index = Array.prototype.slice.call(this.imgSpans).indexOf(span);
+                var nodes = this.eleMaps['sidebar-thumbnails-container'].children;
+                var imgSpans = [];
+                [].forEach.call(nodes, function(node){
+                    if(unsafeWindow.getComputedStyle(node).display!="none"){
+                        imgSpans.push(node);
+                    }
+                });
+
+                var index = Array.prototype.slice.call(imgSpans).indexOf(span);
                 if (index != -1) {
-                    var total = this.imgSpans.length;
+                    var total = imgSpans.length;
                     if (total - index < prefs.gallery.scrollEndAndLoad_num) {
                         return true;
                     }
                 }
             },
-            arrowVisib:function(){//当当前选择元素的前面或者后面没有元素的时候隐藏控制箭头
+            arrowVisib:function(checkEnd){//当当前选择元素的前面或者后面没有元素的时候隐藏控制箭头
 
                 var icps=this.eleMaps['img-controler-pre'].style;
                 var icns=this.eleMaps['img-controler-next'].style;
@@ -15894,7 +18594,7 @@ ImgOps | https://imgops.com/#b#`;
                 };
 
                 // 最后几张图片，滚到底部添加新的图片
-                if (prefs.gallery.scrollEndAndLoad && this._isLastSpan(nextSpan)) {
+                if (prefs.gallery.scrollEndAndLoad && checkEnd && (!nextSpan || this._isLastSpan(nextSpan))) {
                     this.scrollToEndAndReload();
                 }
 
@@ -15928,9 +18628,9 @@ ImgOps | https://imgops.com/#b#`;
                 return stop;
             },
 
-            reload: function() {// 重新加载所有图片到库里面
+            reload: async function() {// 重新加载所有图片到库里面
                 // 函数在 LoadingAnimC 中
-                var data = this.getAllValidImgs();
+                var data = await this.getAllValidImgs();
                 // 设置当前选中的图片
                 data.target = {
                     src: this.selected.dataset.src
@@ -15940,113 +18640,351 @@ ImgOps | https://imgops.com/#b#`;
 
                 this.load(data, null, true);
             },
-            reloadNew: function() {// 加载新的图片到库里面
+            reloadNew: async function() {// 加载新的图片到库里面
                 var newer = true;
-                var data = this.getAllValidImgs(newer);
+                var data = await this.getAllValidImgs(newer);
                 if (data.length) {
                     this._appendThumbSpans(data);
                 }
             },
-            getAllValidImgs:function(newer){
-                var validImgs = [];
-                var imgs = document.getElementsByTagName('img'),
-                    container = document.querySelector('.pv-gallery-container'),
+            getAllValidImgs:async function(newer, checkListenBg){
+                let validImgs = [];
+                let container = document.querySelector('.pv-gallery-container'),
                     preloadContainer = document.querySelector('.pv-gallery-preloaded-img-container');
 
-                imgs = Array.prototype.slice.call(imgs);
-                arrayFn.forEach.call(document.querySelectorAll("iframe"),function(iframe){
-                    if(iframe.src && (iframe.src=="about:blank" || iframe.src.replace(/\/[^\/]*$/,"").indexOf(location.hostname)!=-1)){
-                        try{
-                            arrayFn.forEach.call(iframe.contentWindow.document.getElementsByTagName('img'),function(img){
-                                imgs.push(img);
-                            });
-                        }catch(e){
-                            debug(e.toString());
-                        }
-                    }
-                });
-                var bgReg=/.*url\(\s*["']?(.+?)["']?\s*\)/i;
-                var bgImgs=Array.from(document.querySelectorAll('*'))
-                    .reduce((total, node) => {
-                        if(node.nodeName != "IMG" && !node.src && (!node.className || !node.className.indexOf || node.className.indexOf("pv-")==-1)){
-                            let prop = unsafeWindow.getComputedStyle(node).backgroundImage;
-                            let match = bgReg.exec(prop)
-                            if (match) {
-                                node.src=match[1];
-                                total.push(node);
+                let bgReg = /^\s*url\(\s*["']?([^ad\s'"#].+?)["']?\s*\)([^'"]|$)/i;
+                let body = getBody(document);
+                let linkMedias = [];
+                function anylizeEle(total, node) {
+                    if (/^iframe$/i.test(node.nodeName)) {
+                        if (node.name == "pagetual-iframe") return total;
+                        if (!node.src || (node.src && (node.src == "about:blank" || node.src.replace(/\/[^\/]*$/,"").indexOf(location.hostname) != -1))) {
+                            try {
+                                arrayFn.forEach.call(node.contentWindow.document.querySelectorAll('*'), function(n){
+                                    total = anylizeEle(total, n);
+                                });
+                            } catch(e) {
+                                debug(e.toString());
                             }
                         }
                         return total;
-                }, []);
-                if(bgImgs)imgs=imgs.concat(bgImgs);
-                // 排除库里面的图片
-                imgs = imgs.filter(function(img){
-                    return !(container.contains(img) || (preloadContainer&&preloadContainer.contains(img)));
-                });
+                    } else if (/^img$/i.test(node.nodeName)) {
+                        total.push(node);
+                    } else if (/^svg$/i.test(node.nodeName)) {
+                        if (node.clientHeight != 0 && (!node.classList || !node.classList.contains("pagetual"))) {
+                            try {
+                                let images = node.querySelectorAll('image');
+                                if (images.length) {
+                                    arrayFn.forEach.call(images, function(image){
+                                        let src = image.href && image.href.baseVal;
+                                        if (src) {
+                                            image.src = canonicalUri(src, image.ownerDocument.URL, image.ownerDocument.baseURI);
+                                            total.push(image);
+                                        }
+                                    });
+                                } else {
+                                    const xml = new XMLSerializer().serializeToString(node);
+                                    const ImgBase64 = `data:image/svg+xml;base64,${window.btoa(unescape(encodeURIComponent(xml)))}`;
+                                    node.src = ImgBase64;
+                                    total.push(node);
+                                }
+                            } catch(e) {
+                                debug(e);
+                            }
+                        }
+                    } else if (/^canvas$/i.test(node.nodeName)) {
+                        if (node.clientHeight != 0) {
+                            try {
+                                if (!node.src) {
+                                    node.src = node.toDataURL("image/png");
+                                }
+                            } catch(e) {}
+                        }
+                        if (!node.src && node.dataset.src) {
+                            node.src = node.dataset.src;
+                        }
+                        if (node.src) {
+                            total.push(node);
+                        }
+                    } else if (/^a$/i.test(node.nodeName)) {
+                        if (node.href && node.href.length < 300 && imageReg.test(node.href)) {
+                            let src = node.href;
+                            if (/[&\?]url\=/.test(src)) {
+                                src = src.replace(/.*[&\?]url\=(.*?)(&.*|$)/, "$1");
+                                try {
+                                    src = decodeURIComponent(src);
+                                } catch (e) {}
+                            } else if (/[&\?]https?:/.test(src)) {
+                                src = src.replace(/.*[&\?](https?:)/, "$1");
+                                try {
+                                    src = decodeURIComponent(src);
+                                } catch (e) {}
+                            }
+                            node.src = src;
+                            linkMedias.push(node);
+                        }
+                    }
+                    if (node.shadowRoot) {
+                        let nodes = node.shadowRoot.querySelectorAll('*');
+                        for (let i = 0; i < nodes.length; i++) {
+                            total = anylizeEle(total, nodes[i]);
+                        }
+                    }
+                    if (checkListenBg && !prefs.floatBar.listenBg) {
+                        return total;
+                    }
+                    if(!node.className || !node.className.indexOf || node.className.indexOf("pv-")==-1){
+                        let prop = getComputedStyle(node).backgroundImage;
+                        let hasSrc = /^(audio|embed|iframe|img|input|script|source|track|video|svg|canvas)$/i.test(node.nodeName);
+                        if (prop != "none") {
+                            let match = bgReg.exec(prop);
+                            if (match) {
+                                if (!hasSrc) {
+                                    let src = match[1].replace(/\\"/g, '"');
+                                    node.src = src;
+                                    total.push(node);
+                                    hasSrc = true;
+                                    prop = prop.replace(bgReg, "$2");
+                                    match = bgReg.exec(prop);
+                                }
+                                while (match) {
+                                    let src = match[1].replace(/\\"/g, '"');
+                                    node = document.createElement("img");
+                                    node.src = src;
+                                    total.push(node);
+                                    prop = prop.replace(bgReg, "$2");
+                                    match = bgReg.exec(prop);
+                                }
+                            }
+                        }
+                        prop = getComputedStyle(node, '::before').backgroundImage;
+                        if (prop != "none") {
+                            let match = bgReg.exec(prop);
+                            if (match) {
+                                if (!hasSrc) {
+                                    let src = match[1].replace(/\\"/g, '"');
+                                    node.src = src;
+                                    total.push(node);
+                                    hasSrc = true;
+                                    prop = prop.replace(bgReg, "$2");
+                                    match = bgReg.exec(prop);
+                                }
+                                while (match) {
+                                    let src = match[1].replace(/\\"/g, '"');
+                                    node = document.createElement("img");
+                                    node.src = src;
+                                    total.push(node);
+                                    prop = prop.replace(bgReg, "$2");
+                                    match = bgReg.exec(prop);
+                                }
+                            }
+                        }
+                        prop = getComputedStyle(node, '::after').backgroundImage;
+                        if (prop != "none") {
+                            let match = bgReg.exec(prop);
+                            if (match) {
+                                if (!hasSrc) {
+                                    let src = match[1].replace(/\\"/g, '"');
+                                    node.src = src;
+                                    total.push(node);
+                                    hasSrc = true;
+                                    prop = prop.replace(bgReg, "$2");
+                                    match = bgReg.exec(prop);
+                                }
+                                while (match) {
+                                    let src = match[1].replace(/\\"/g, '"');
+                                    node = document.createElement("img");
+                                    node.src = src;
+                                    total.push(node);
+                                    prop = prop.replace(bgReg, "$2");
+                                    match = bgReg.exec(prop);
+                                }
+                            }
+                        }
+                        let iconStyle = getComputedStyle(node, '::before');
+                        prop = iconStyle.content;
+                        if (!prop || prop === "none") {
+                            iconStyle = getComputedStyle(node, '::after');
+                            prop = iconStyle.content;
+                        }
+                        if (prop && prop !== "none") {
+                            prop = prop.replace(/[ '"]/g, "");
+                            if (prop && prop.length == 1) {
+                                let src = icon2Base64(node, prop, iconStyle);
+                                if (src && src != "data:,") {
+                                    node = document.createElement("img");
+                                    node.src = src;
+                                    total.push(node);
+                                }
+                            }
+                        }
+                    }
+                    return total;
+                }
+                var imgs;
+                if (matchedRule.gallery) {
+                    imgs = matchedRule.gallery();
+                } else {
+                    imgs = Array.from(body.querySelectorAll('*')).concat([body]).reduceRight((total, node) => {
+                        return anylizeEle(total, node);
+                    }, []);
+                    [].forEach.call(document.head.querySelectorAll("link[rel*='icon']"), node => {
+                        if (imageReg.test(node.href)) {
+                            node.src = node.href;
+                            linkMedias.push(node);
+                        }
+                    });
+                    [].forEach.call(document.head.querySelectorAll('meta[itemprop="image"]'), node => {
+                        if (imageReg.test(node.content)) {
+                            node.src = node.content;
+                            linkMedias.push(node);
+                        }
+                    });
+                    imgs = imgs.reverse().sort((a, b) => {
+                        if (a.offsetParent && !b.offsetParent) {
+                            return -1;
+                        }
+                        if (!a.offsetParent && b.offsetParent) {
+                            return 1;
+                        }
+                        return 0;
+                    }).concat(linkMedias.reverse());
+                    // 排除库里面的图片
+                    imgs = imgs.filter(function(img){
+                        if (img.parentNode) {
+                            if (img.parentNode.id=="icons" || img.parentNode.id=="pagetual-preload") {
+                                return false;
+                            } else if (img.parentNode.classList && img.parentNode.classList.contains("search-jumper-btn")) {
+                                return false;
+                            } else if (img.classList && img.classList.contains("pagetual")) {
+                                return false;
+                            }
+                        }
+                        return !(container.contains(img) || (preloadContainer&&preloadContainer.contains(img)));
+                    });
+                }
 
+                await sleep(0);
                 // 已经在图库里面的
                 var self = this;
-                imgs.forEach(function(img) {
-                    pretreatment(img);
-                    if(!img.src || (img.getAttribute && !img.getAttribute("src"))) return;
-                    if (newer && self._dataCache[img.src]) return;
+                for (const img of imgs) {
+                    let isImg = /^IMG$/i.test(img.nodeName);
+                    if (isImg) {
+                        pretreatment(img);
+                    }
+                    if(!img.src || (isImg && img.getAttribute && !img.getAttribute("src"))) continue;
+                    if (newer && self._dataCache[img.src]) continue;
 
                     var result = findPic(img);
                     if (result) {
+                        if (result.src === 'data:,') continue;
+
+                        if (result.imgSrc.indexOf('blob:') === 0){
+                            if (result.src == result.imgSrc) {
+                                result.imgSrc = await getBase64FromBlobUrl(result.imgSrc);
+                                result.src = result.imgSrc;
+                                result.srcs = [result.imgSrc];
+                            } else {
+                                result.imgSrc = await getBase64FromBlobUrl(result.imgSrc);
+                                result.srcs = [result.imgSrc];
+                            }
+                        }
+                        if (result.sizeH == 0 && result.sizeW == 0) {
+                            result.sizeH = img.naturalHeight;
+                            result.sizeW = img.naturalWidth;
+                        }
                         validImgs.push(result);
                         self.data.push(result);
                     }
 
                     self._dataCache[img.src] = true;
-                });
+                }
 
                 return validImgs;
             },
             scrollToEndAndReload: function() {// 滚动主窗口到最底部，然后自动重载库的图片
-
-                window.scrollTo(0, 9999999);
-
+                if (this.isScrollToEndAndReloading) return;
+                this.isScrollToEndAndReloading = true;
+                var scrollTarget;
+                if (document.documentElement.scrollTop || document.documentElement.scrollHeight - document.documentElement.clientHeight > 100) {
+                    scrollTarget = document.documentElement;
+                } else if (getBody(document).scrollTop) {
+                    scrollTarget = getBody(document);
+                } else if (this.data && this.data.length) {
+                    let tempEle;
+                    for (let i = 0; i < this.data.length; i++) {
+                        tempEle = this.data[i].img;
+                        if (tempEle && tempEle.parentNode) {
+                            break;
+                        }
+                    }
+                    if (tempEle) {
+                        while (tempEle && (tempEle.scrollHeight - tempEle.clientHeight < 10 || unsafeWindow.getComputedStyle(tempEle).overflowY === "hidden")) {
+                            tempEle = tempEle.parentNode;
+                        }
+                    }
+                    if (tempEle) scrollTarget = tempEle;
+                }
+                scrollTarget = scrollTarget || document.documentElement;
                 var self = this;
-                clearTimeout(self.reloadTimeout);
-                self.reloadTimeout = setTimeout(function(){
-                    // self.reload();
-                    self.reloadNew();
-                }, 1000);
+                var des = document.documentElement.style;
+                des.overflow = '';
+                document.head.appendChild(self.hideScrollStyle);
+                let scrollIntv = setInterval(function() {
+                    let scrollTop = scrollTarget.scrollTop;
+                    scrollTarget.scrollTop += 800;
+                    if (scrollTop === scrollTarget.scrollTop) {
+                        clearInterval(scrollIntv);
+                        self.isScrollToEndAndReloading = false;
+                        setTimeout(() => {
+                            des.overflow = 'hidden';
+                            document.head.removeChild(self.hideScrollStyle);
+                        }, 0);
+                        if (self.lastScrollTop == scrollTop) return;
+                        clearTimeout(self.reloadTimeout);
+                        self.reloadTimeout = setTimeout(function() {
+                            self.reloadNew();
+                            self.loadThumb();
+                            self.lastScrollTop = scrollTop;
+                        }, 300);
+                    } else {
+                        self.reloadNew();
+                    }
+                }, 150);
             },
             exportImages: function () {// 导出所有图片到新窗口
-                var nodes = document.querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]'),i;
-                //var arr = Array.prototype.map.call(nodes, function(node){
-                //    if(unsafeWindow.getComputedStyle(node).display=="none")return "";
-                //    else return '<div><img src=' + node.dataset.src + '></div>'
-                //});
+                var nodes = this.eleMaps['sidebar-thumbnails-container'].querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]:not(.ignore)'),i;
 
                 var arr=[];
                 for (i = 0; i < nodes.length; ++i) {
                     if(unsafeWindow.getComputedStyle(nodes[i]).display=="none")arr.push("");
-                    else arr.push('<div><img src=' + nodes[i].dataset.src + '></div>');
+                    else arr.push('<div><img src="' + nodes[i].dataset.src + '" /><p></p></div>');
                 }
 
                 var title = document.title;
 
                 var html = '\
                  <head>\
-                 <title>' + title + ' '+i18n("exportImages")+'</title>\
+                 <title>Picviewer CE+ '+i18n("exportImages")+' '+title+'</title>\
                  <style>\
                  .toTop{width:28px;height:28px;border-radius:14px;position: fixed;right:2px;bottom: 2px;cursor: pointer;background-color:#000;opacity:.3;padding:0em!important;border:0px!important;z-index:1}\
                  .toTop:hover{opacity:1}\
                  .toTop>span{height:28px;line-height:28px;display:block;color:#FFF;text-align:center;font-size:20px;}\
                  .grid{-moz-column-count:4;-webkit-column-count:4;column-count:4;-moz-column-gap: 1em;-webkit-column-gap: 1em;column-gap: 1em;}\
                  .grid>div{padding: 1em;margin: 0 0 1em 0;-moz-page-break-inside: avoid;-webkit-column-break-inside: avoid;break-inside: avoid;}\
-                 .grid>div>img{width: 100%;margin-bottom:10px;}\
+                 .grid>div>img{width: 100%;}\
                  .list>div {text-align:center;}\
                  .list>div>img { max-width: 100%; }\
                  .gridBig{margin: 0px;}\
                  .gridBig>div { float: left;margin: 0px 0px 1px 1px;}\
                  .gridBig>div>img { max-width: 100%; }\
-                 .select{opacity: 0.8;border: 5px solid red!important;}\
-                 body>div{border: 5px solid black;margin: 1px;}\
-                 body>div:hover{border: 5px solid #dbdbdb;}\
-                 body>div{position:relative;}\
+                 .select{border: 5px solid red!important;}\
+                 body>div{border: 5px solid black;margin: 1px; overflow: hidden;}\
+                 .select>img{transform: scale3d(1.1, 1.1, 1.1);}\
+                 body>div>img{transition: transform .3s ease 0s;}\
+                 body>div:hover{border: 5px solid #dbdbdb; background: #80808020;}\
+                 body>div{position: relative; cursor: pointer}\
+                 body>div>p{position: absolute; margin: 0; background: #ffffff80; top: 0;}\
                  </style>\
                  </head>\
                  <span class="toTop">\
@@ -16054,10 +18992,10 @@ ImgOps | https://imgops.com/#b#`;
                  </span>\
                  <body class="'+prefs.gallery.exportType+'">\
                  <p style="width:100vw;display:flex;flex-direction:column;">\
-                 <img id="bigImg" style="pointer-events:none;position:fixed;z-index:999;width:100vw;top:0px;align-self:center;"></p>\
+                 <img id="bigImg" style="pointer-events:none;position:fixed;z-index:999;width:100vw;top:0px;align-self:center;" /></p>\
                  <p>【'+i18n("picTitle")+'】：' + title + '</p>\
                  <p>【'+i18n("picNum")+'】：' + nodes.length + ' <select onchange="document.body.className=this.options[this.options.selectedIndex].value"><option value="grid" '+(prefs.gallery.exportType=="grid"?"selected='selected'":"")+'>'+i18n("grid")+'</option><option value="gridBig" '+(prefs.gallery.exportType=="gridBig"?"selected='selected'":"")+'>'+i18n("gridBig")+'</option><option value="list" '+(prefs.gallery.exportType=="list"?"selected='selected'":"")+'>'+i18n("list")+'</option> </select> \
-                 <input type="button" value="'+i18n("exportImagesUrl")+'" onclick="var imgStr=\'\',selList=document.querySelectorAll(\'.select>img\');if(selList.length==0)[].forEach.call(document.querySelectorAll(\'img\'),function(i){imgStr+=i.src+\' \\n\'});else{[].forEach.call(selList,function(i){imgStr+=i.src+\' \\n\'});}window.prompt(\''+i18n("exportImagesUrlPop")+'\',imgStr);">\
+                 <input type="button" value="'+i18n("exportImagesUrl")+'" onclick="var imgStr=\'\',selList=document.querySelectorAll(\'.select>img\');if(selList.length==0)[].forEach.call(document.querySelectorAll(\'img\'),function(i){imgStr+=i.src+\' \\n\'});else{[].forEach.call(selList,function(i){imgStr+=i.src+\' \\n\'});}window.prompt(\''+i18n("exportImagesUrlPop")+'\',imgStr);" />\
                   ('+i18n("picTips")+')</p><p>'+i18n("savePageTips")+"</p>";
 
                 html += arr.join('\n') +
@@ -16067,17 +19005,25 @@ ImgOps | https://imgops.com/#b#`;
                  });\
                  var bigImg=document.querySelector("#bigImg"),body=document.body;\
                  [].forEach.call(document.querySelectorAll("div>img"),function(i){\
-                 i.onerror=function(e){i.style.display="none"};\
+                 if(i.naturalWidth&&i.naturalHeight)i.nextElementSibling.innerText=i.naturalWidth+" x "+i.naturalHeight;\
+                 i.onerror=function(e){i.style.display="none";i.parentNode.title="Reload"};\
+                 i.onload=function(e){i.style.display="";i.parentNode.title="";if(i.naturalWidth&&i.naturalHeight)i.nextElementSibling.innerText=i.naturalWidth+" x "+i.naturalHeight};\
                  i.onmouseover=i.onmousemove=function(e){bigImg.style.top=(this.width/this.height>body.clientWidth/body.clientHeight?10+(body.clientHeight*0.95-body.clientWidth*this.height/this.width)*e.offsetY/this.height:10-(body.clientWidth*this.height/this.width-body.clientHeight*0.95)*e.offsetY/this.height);bigImg.src=e.ctrlKey?this.src:"";bigImg.style.display=e.ctrlKey?"":"none";};\
                  });\
                  [].forEach.call(document.querySelectorAll("body>div"),function(i){\
-                 i.onclick=function(e){if(e.ctrlKey&&i.firstChild.src){window.open(i.firstChild.src,"_blank")}else{this.classList.toggle("select")}}\
+                 i.onclick=function(e){if(i.firstChild.style.display=="none"){i.firstChild.style.display="";i.firstChild.src=i.firstChild.src;return;}if(e.ctrlKey&&i.firstChild.src){window.open(i.firstChild.src,"_blank")}else{this.classList.toggle("select")}}\
                  });\
                  </script></body>';
-                _GM_openInTab('data:text/html;charset=utf-8,' + encodeURIComponent(html),{active:true});
+                if (navigator.userAgent.indexOf("Firefox") != -1) {
+                    let c = unsafeWindow.open("", "_blank");
+                    c.document.write(html);
+                    c.document.close();
+                } else {
+                    _GM_openInTab('data:text/html;charset=utf-8,' + encodeURIComponent(html),{active:true});
+                }
             },
             copyImages: function(isAlert) {
-                var nodes = document.querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]');
+                var nodes = this.eleMaps['sidebar-thumbnails-container'].querySelectorAll('.pv-gallery-sidebar-thumb-container[data-src]:not(.ignore)');
                 var urls = [];
                 [].forEach.call(nodes, function(node){
                     if(unsafeWindow.getComputedStyle(node).display!="none"){
@@ -16085,7 +19031,12 @@ ImgOps | https://imgops.com/#b#`;
                     }
                 });
 
-                _GM_setClipboard(urls.join("\n"));
+                let copyData = urls.join("\n");
+
+                _GM_setClipboard(copyData);
+
+                this.urlsTextarea.value = copyData;
+                this.urlsTextareaCon.style.display = "block";
 
                 if (isAlert) {
                     this.showTips(i18n("copySuccess",urls.length));
@@ -16105,9 +19056,14 @@ ImgOps | https://imgops.com/#b#`;
             },
 
             addStyle:function(){
-                var style=document.createElement('style');
-                style.type='text/css';
-                style.textContent='\
+                if (GalleryC.style) {
+                    if (!GalleryC.style.parentNode) {
+                        GalleryC.style = _GM_addStyle(GalleryC.style.innerText);
+                        this.globalSSheet = GalleryC.style.sheet;
+                    }
+                    return;
+                }
+                GalleryC.style=_GM_addStyle('\
                  /*最外层容器*/\
                     .pv-gallery-container {\
                     position: fixed;\
@@ -16115,25 +19071,32 @@ ImgOps | https://imgops.com/#b#`;
                     left: 0;\
                     width: 100%;\
                     height: 100%;\
-                    min-width:none;\
-                    min-height:none;\
+                    min-width:unset;\
+                    min-height:unset;\
                     padding: 0;\
                     margin: 0;\
                     border: none;\
-                    z-index:'+prefs.imgWindow.zIndex+';\
+                    z-index:'+(prefs.imgWindow.zIndex - 1)+';\
                     background-color: transparent;\
+                    display: initial;\
                     }\
                     /*全局border-box*/\
                     .pv-gallery-container span{\
                     -moz-box-sizing: border-box;\
                     box-sizing: border-box;\
                     line-height: 1.6;\
+                    text-overflow: unset;\
+                    background-image: initial;\
+                    float: initial;\
                     }\
                     .pv-gallery-container * {\
                     font-size: 14px;\
+                    display: initial;\
+                    flex-direction: row;\
+                    user-select: none;\
                     }\
                     /*点击还原的工具条*/\
-                    .pv-gallery-maximize-trigger{\
+                    span.pv-gallery-maximize-trigger{\
                     position:fixed;\
                     bottom:15px;\
                     left:15px;\
@@ -16151,7 +19114,7 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-maximize-trigger:hover{\
                     opacity:0.9;\
                     }\
-                    .pv-gallery-maximize-trigger-close{\
+                    span.pv-gallery-maximize-trigger-close{\
                     display:inline-block;\
                     padding-left:10px;\
                     vertical-align:middle;\
@@ -16163,30 +19126,95 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-maximize-trigger-close:hover{\
                     background-color:#333;\
                     }\
-                    @media only screen and (max-width: 800px) {\
-                     .pv-gallery-range-box>input {\
-                     display: none;\
+                    span.pv-gallery-head-command-close{\
+                    position:absolute;\
+                    top:0;\
+                    width:40px;\
+                    border-left: 1px solid #333333;\
+                    background:transparent no-repeat center;\
+                    background-image:url("'+prefs.icons.loadingCancle+'");\
+                    }\
+                    .pv-gallery-maximize-container+p{\
+                    position: fixed;\
+                    width: 100%;\
+                    z-index: 2;\
+                    text-align: center;\
+                    pointer-events: none;\
+                    margin-bottom: 45px;\
+                    left: 0;\
+                    bottom: 0;\
+                    opacity: 0;\
+                    transition: all .3s ease;\
+                    }\
+                    @media only screen and (max-width: 600px) {\
+                     .pv-gallery-maximize-container>.maximizeChild{\
+                     width:calc(50vw - 5px);\
                      }\
-                     .pv-gallery-maximize-container{\
-                     column-count: 2;\
-                     -moz-column-count: 2;\
-                     -webkit-column-count: 2;\
-                     padding-top: 300px;\
-                     }\
-                     .pv-gallery-sidebar-viewmore-bottom.showmore{\
-                     transform: scale(3.5);\
-                     bottom: 50px;\
-                     }\
-                     .pv-gallery-maximize-container span>p{\
-                     opacity: 0.6;\
+                    }\
+                    @media only screen and (min-width: 600px) {\
+                     .pv-gallery-maximize-container>.maximizeChild{\
+                     width:calc(33vw - 5px);\
                      }\
                     }\
                     @media only screen and (min-width: 800px) {\
+                     .pv-gallery-maximize-container>.maximizeChild{\
+                     width:calc(25vw - 5px);\
+                     }\
+                    }\
+                    @media only screen and (min-width: 1000px) {\
+                     .pv-gallery-maximize-container>.maximizeChild{\
+                     width:calc(20vw - 5px);\
+                     }\
+                    }\
+                    @media only screen and (min-width: 1130px) {\
+                     .pv-gallery-maximize-container>.maximizeChild{\
+                     width:calc(16.6vw - 6px);\
+                     }\
+                    }\
+                    @media only screen and (max-width: 799px) {\
+                     .pv-gallery-range-box>input {\
+                     display: none;\
+                     }\
+                     .pv-gallery-head-command-drop-list {\
+                     right: 10px;\
+                     }\
+                     span.pv-gallery-head {\
+                     white-space: nowrap;\
+                     }\
+                     span.pv-gallery-sidebar-toggle-content {\
+                     font-size: 25px!important;\
+                     }\
+                     span.pv-gallery-sidebar-toggle {\
+                     height: 25px!important;\
+                     opacity: 0.6;\
+                     border-radius: 0!important;\
+                     }\
+                     .pv-gallery-sidebar-viewmore:not(.showmore) {\
+                     opacity: 0!important;\
+                     }\
                      .pv-gallery-maximize-container{\
-                     column-count: 5;\
-                     -moz-column-count: 5;\
-                     -webkit-column-count: 5;\
-                     padding-top: 30px;\
+                     margin-top: 30px;\
+                     }\
+                     .pv-gallery-sidebar-viewmore.showmore{\
+                     transform: scale(1.5);\
+                     bottom: 10px;\
+                     }\
+                     .pv-gallery-maximize-container span>p{\
+                     opacity: 0.3;\
+                     }\
+                     .pv-gallery-maximize-container+p{\
+                     opacity: 0.2;\
+                     }\
+                     span.pv-gallery-head-command-close {\
+                     position: fixed!important;\
+                     right: 0!important;\
+                     height: 29px!important;\
+                     background-color: black;\
+                     }\
+                    }\
+                    @media only screen and (min-width: 799px) {\
+                     .pv-gallery-maximize-container{\
+                     margin-top: 30px;\
                      }\
                      .pv-gallery-maximize-container span>p{\
                      opacity: 0;\
@@ -16220,15 +19248,14 @@ ImgOps | https://imgops.com/#b#`;
                     overflow: hidden;\
                     text-overflow: ellipsis;\
                     white-space: nowrap;\
-                    max-width: 800px;\
+                    max-width: 65%;\
                     }\
                     /*顶栏*/\
-                    .pv-gallery-head {\
+                    span.pv-gallery-head {\
                     position: absolute;\
                     top: 0;\
                     left: 0;\
                     width: 100%;\
-                    flex-wrap: wrap;\
                     min-height: 30px;\
                     height: auto;\
                     z-index:1;\
@@ -16240,13 +19267,21 @@ ImgOps | https://imgops.com/#b#`;
                     font-size: 14px;\
                     color:#757575;\
                     padding-right:42px;\
-                    display: table;\
+                    display: block;\
+                    overflow-x: visible;\
+                    overflow-y: auto;\
+                    scrollbar-width: none;\
+                    -ms-overflow-style: none;\
+                    }\
+                    span.pv-gallery-head::-webkit-scrollbar {\
+                    width: 0 !important;\
+                    height: 0 !important;\
                     }\
                     .pv-gallery-head > span{\
                     vertical-align:middle;\
                     }\
                     /*顶栏左边*/\
-                    .pv-gallery-head-float-left{\
+                    span.pv-gallery-head-float-left{\
                     float:left;\
                     height:100%;\
                     text-align:left;\
@@ -16264,20 +19299,37 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-head-left-img-info{\
                     cursor:help;\
                     }\
+                    .pv-gallery-head-left-img-info-size {\
+                    margin-left: 6px;\
+                    margin-right: 6px;\
+                    }\
                     .pv-gallery-head-left-img-info-description {\
                     margin-left: 10px;\
                     margin-right: 10px;\
+                    overflow: hidden;\
+                    text-overflow: ellipsis;\
+                    white-space: nowrap;\
+                    max-width: 6em;\
+                    display: inherit;\
                     }\
                     .pv-gallery-range-box{\
                     display: inline-flex;\
                     justify-content: center;\
                     align-items: center;\
                     }\
+                    .pv-gallery-range-box>#pinSize{\
+                    margin: 0 5px;\
+                    padding: 0px;\
+                    }\
                     .pv-gallery-range-box>span{\
                     padding: 0 5px 0 5px;\
+                    white-space: nowrap;\
                     }\
                     .pv-gallery-range-box>input{\
                     background: white;\
+                    min-height: auto;\
+                    padding: 0;\
+                    -webkit-appearance: auto;\
                     }\
                     /*顶栏里面的按钮样式-开始*/\
                     .pv-gallery-head-command{\
@@ -16307,19 +19359,10 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-head-command > *{\
                     vertical-align:middle;\
                     }\
-                    .pv-gallery-head-command-close{\
-                    position:absolute;\
-                    top:0;\
-                    right:0;\
-                    width:40px;\
-                    border-left: 1px solid #333333;\
-                    background:transparent no-repeat center;\
-                    background-image:url("'+prefs.icons.loadingCancle+'");\
-                    }\
                     .pv-gallery-head-command-slide-show-countdown{\
                     font-size:0.8em;\
                     }\
-                    .pv-gallery-head-command-slide-show-button{\
+                    span.pv-gallery-head-command-slide-show-button{\
                     border-radius:36px;\
                     display:inline-block;\
                     width:18px;\
@@ -16335,22 +19378,31 @@ ImgOps | https://imgops.com/#b#`;
                     border-bottom:4px solid transparent;\
                     border-left:8px solid #757575;\
                     vertical-align:middle;\
+                    margin-left: 1px;\
                     }\
                     .pv-gallery-head-command-slide-show-button-inner_stop{\
                     border-color:#757575;\
+                    margin-left: 0px;\
                     }\
-                    .pv-gallery-head-command-collect-icon{\
+                    span.pv-gallery-head-command-collect-icon{\
                     display:inline-block;\
                     height:20px;\
                     width:20px;\
                     background:transparent url("' + prefs.icons.fivePointedStar + '") 0 0 no-repeat;\
                     }\
-                    .pv-gallery-head-left-lock-icon{\
+                    span.pv-gallery-head-left-lock-icon{\
                     display:inline-block;\
                     height:20px;\
                     width:20px;\
                     cursor:pointer;\
                     background:transparent url("' + prefs.icons.lock + '") 0 0 no-repeat;\
+                    }\
+                    span.pv-gallery-head-left-filter-icon{\
+                    display:inline-block;\
+                    height:20px;\
+                    width:20px;\
+                    cursor:pointer;\
+                    background:transparent url("' + prefs.icons.filter + '") 0 0 no-repeat;\
                     }\
                     .pv-gallery-head-command-collect-icon ~ .pv-gallery-head-command-collect-text::after{\
                     content:"'+i18n("collect")+'";\
@@ -16365,14 +19417,17 @@ ImgOps | https://imgops.com/#b#`;
                     color:#939300 !important;\
                     display:none;\
                     }\
+                    .pv-gallery-head-command-urlFilter{\
+                    color:#e9cccc !important;\
+                    display:none;\
+                    }\
                     .pv-gallery-head-command:hover{\
                     background-color:#272727;\
                     color:#ccc;\
                     }\
                     /*droplist*/\
                     .pv-gallery-head-command-drop-list{\
-                    position:absolute;\
-                    right:0;\
+                    position:fixed;\
                     display:none;\
                     box-shadow:0 0 3px #808080;\
                     background-color:#272727;\
@@ -16396,6 +19451,7 @@ ImgOps | https://imgops.com/#b#`;
                     resize:both;\
                     width:auto;\
                     height:auto;\
+                    background: white;\
                     }\
                     .pv-gallery-head-command-drop-list-item_disabled{\
                     color:#757575;\
@@ -16407,16 +19463,38 @@ ImgOps | https://imgops.com/#b#`;
                     text-align:left;\
                     max-width:50px;\
                     height:20px;\
+                    background: white;\
+                    color: black;\
+                    box-sizing: border-box;\
+                    display: initial;\
+                    margin: 0 5px;\
+                    padding: 0 5px;\
                     }\
                     .pv-gallery-head-command-drop-list-item input[type=checkbox]{\
-                    width:20px\
+                    width:20px;\
+                    box-sizing: border-box;\
+                    display: initial;\
+                    margin: 0 5px;\
+                    opacity: 1;\
+                    position: initial;\
                     }\
                     .pv-gallery-head-command-drop-list-item > * {\
                     vertical-align:middle;\
+                    width: auto;\
+                    opacity: 1;\
+                    height: auto;\
+                    padding: 0;\
+                    margin: 0;\
                     }\
                     .pv-gallery-head-command-drop-list-item label {\
                     font-weight: normal;\
-                    display:inline\
+                    display:inline;\
+                    font-size:unset;\
+                    line-height: initial;\
+                    color: inherit;\
+                    }\
+                    .pv-gallery-head-command-drop-list-item label:after {\
+                    display:none;\
                     }\
                     .pv-gallery-head-command-drop-list-item:hover{\
                     background-color:#404040;\
@@ -16490,8 +19568,9 @@ ImgOps | https://imgops.com/#b#`;
                     height: 100%;\
                     width: 100%;\
                     background-clip: padding-box;\
-                    background-color: rgba(20,20,20,0.75);\
+                    background-color: ' + (prefs.gallery.backgroundColor || 'rgba(20,20,20,0.75)') + ';\
                     position:relative;\
+                    transition: background-color .3s ease;\
                     }\
                     .pv-gallery-img-container-top {\
                     border-top: '+ prefs.gallery.sidebarSize +'px solid transparent;\
@@ -16515,17 +19594,21 @@ ImgOps | https://imgops.com/#b#`;
                     cursor:pointer;\
                     opacity:0.3;\
                     z-index:1;\
+                    transition: opacity .5s ease;\
                     }\
-                    .pv-gallery-img-controler-pre{\
-                    background:rgba(70,70,70,0.5) url("'+prefs.icons.arrowLeft+'") no-repeat center;\
+                    .pv-gallery-sidebar-toggle-hide .pv-gallery-img-controler{\
+                    opacity:0;\
+                    }\
+                    span.pv-gallery-img-controler-pre{\
+                    background:rgba(70,70,70,0.8) url("'+prefs.icons.arrowLeft+'") no-repeat center;\
                     left:10px;\
                     }\
-                    .pv-gallery-img-controler-next{\
-                    background:rgba(70,70,70,0.5) url("'+prefs.icons.arrowRight+'") no-repeat center;\
+                    span.pv-gallery-img-controler-next{\
+                    background:rgba(70,70,70,0.8) url("'+prefs.icons.arrowRight+'") no-repeat center;\
                     right:10px;\
                     }\
                     .pv-gallery-img-controler:hover{\
-                    background-color:rgba(140,140,140,0.5);\
+                    background-color:rgba(140,140,140,0.8);\
                     opacity:0.9;\
                     z-index:2;\
                     }\
@@ -16585,6 +19668,7 @@ ImgOps | https://imgops.com/#b#`;
                     }\
                     .pv-gallery-scrollbar-v-handle{\
                     width:100%;\
+                    right: 0;\
                     }\
                     .pv-gallery-scrollbar-h-handle:hover,\
                     .pv-gallery-scrollbar-v-handle:hover{\
@@ -16611,9 +19695,14 @@ ImgOps | https://imgops.com/#b#`;
                     white-space:nowrap;\
                     }\
                     .pv-gallery-img-parent{\
-                    display:inline-block;\
-                    vertical-align:middle;\
+                    display:inline-flex;\
+                    align-items: center;\
+                    vertical-align: middle;\
+                    justify-content: center;\
                     line-height:0;\
+                    }\
+                    .pv-gallery-img-parent video, .pv-gallery-img-parent>div{\
+                    background-size: cover;\
                     }\
                     .pv-gallery-img_broken{\
                     display:none;\
@@ -16628,19 +19717,19 @@ ImgOps | https://imgops.com/#b#`;
                     padding:0;\
                     border:5px solid #313131;\
                     margin:1px;\
-                    opacity:0.6;\
-                    -webkit-transform:scale(1.2);\
-                    -moz-transform:scale(1.2);\
-                    transform:scale(1.2);\
+                    opacity:0.3;\
+                    box-sizing: content-box;\
                     background-color: #282828cc;\
+                    background-position: center 0;\
+                    background-repeat: no-repeat;\
+                    background-size: cover;\
+                    -webkit-background-size: cover;\
+                    -o-background-size: cover;\
                     '+
                     (prefs.gallery.transition ? ('\
-                    -webkit-transition: opacity 0.15s ease-in-out,\
-                    -webkit-transform 0.1s ease-in-out;\
-                    -moz-transition: opacity 0.15s ease-in-out,\
-                    -moz-transform 0.1s ease-in-out;\
-                    transition: opacity 0.15s ease-in-out,\
-                    transform 0.1s ease-in-out;\
+                    -webkit-transition: opacity 0.5s ease;\
+                    -moz-transition: opacity 0.5s ease;\
+                    transition: opacity 0.5s ease;\
                     ') : '') + '\
                     }\
                     .pv-gallery-img_zoom-out{\
@@ -16648,6 +19737,9 @@ ImgOps | https://imgops.com/#b#`;
                     }\
                     .pv-gallery-img_zoom-in{\
                     cursor:'+support.cssCursorValue.zoomIn+';\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide .pv-gallery-img{\
+                    border:0px;\
                     }\
                     span.pv-gallery-sidebar-toggle{\
                     position:absolute;\
@@ -16657,43 +19749,107 @@ ImgOps | https://imgops.com/#b#`;
                     color:#757575;\
                     white-space:nowrap;\
                     cursor:pointer;\
-                    z-index:1;\
+                    z-index:2;\
+                    transition: background-color .3s ease, opacity .3s ease;\
+                    justify-content: center;\
                     display:none;\
                     }\
-                    span.pv-gallery-sidebar-toggle-hide{\
-                    opacity: 0.5;\
+                    :fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide span.pv-gallery-sidebar-toggle {\
+                    opacity: 0!important;\
                     }\
-                    span.pv-gallery-sidebar-toggle-hide:hover{\
+                    :-webkit-full-screen .pv-gallery-container.pv-gallery-sidebar-toggle-hide span.pv-gallery-sidebar-toggle {\
+                    opacity: 0!important;\
+                    }\
+                    :-ms-fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide span.pv-gallery-sidebar-toggle {\
+                    opacity: 0!important;\
+                    }\
+                    :fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide span.pv-gallery-sidebar-toggle:hover {\
+                    opacity: 1!important;\
+                    }\
+                    :-webkit-full-screen .pv-gallery-container.pv-gallery-sidebar-toggle-hide span.pv-gallery-sidebar-toggle:hover {\
+                    opacity: 1!important;\
+                    }\
+                    :-ms-fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide span.pv-gallery-sidebar-toggle:hover {\
+                    opacity: 1!important;\
+                    }\
+                    :fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head {\
+                    opacity: 0!important;\
+                    }\
+                    :-webkit-full-screen .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head {\
+                    opacity: 0!important;\
+                    }\
+                    :-ms-fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head {\
+                    opacity: 0!important;\
+                    }\
+                    :fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head:hover {\
+                    opacity: 1!important;\
+                    }\
+                    :-webkit-full-screen .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head:hover {\
+                    opacity: 1!important;\
+                    }\
+                    :-ms-fullscreen .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head:hover {\
+                    opacity: 1!important;\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-body>.pv-gallery-img-container>span.pv-gallery-sidebar-toggle{\
+                    opacity: 0.6;\
+                    padding: 35px;\
+                    background-color:#00000000;\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-body>.pv-gallery-img-container>span.pv-gallery-sidebar-toggle:hover{\
                     opacity: 1;\
+                    background-color:rgb(0 0 0 / 50%);\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-body{\
+                    border-top: 0px solid transparent;\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head{\
+                    opacity: 0;\
+                    transition: opacity .3s ease;\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-body>.pv-gallery-img-container{\
+                    background-color: black;\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide>.pv-gallery-head:hover{\
+                    opacity: 1;\
+                    }\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide .pv-gallery-img-parent,\
+                    .pv-gallery-container.pv-gallery-sidebar-toggle-hide .pv-gallery-img{\
+                    cursor: none;\
                     }\
                     .pv-gallery-sidebar-viewmore{\
                     position:absolute;\
                     line-height:0;\
                     text-align:center;\
-                    background-color:#000000;\
-                    color:#757575;\
+                    background-color:#00000030;\
+                    color:#a1a1a1;\
                     white-space:nowrap;\
                     cursor:pointer;\
-                    z-index:1;\
+                    z-index: 2;\
                     display:none;\
                     height: 30px;\
                     width:30px;\
                     border-radius: 15px;\
                     line-height: 2 !important;\
                     font-family: auto;\
-                    opacity: 0.5;\
+                    transition: background-color .3s ease;\
                     }\
                     .pv-gallery-sidebar-viewmore:hover{\
                     opacity: 1;\
+                    background-color:#000000;\
                     }\
-                    .pv-gallery-maximize-container>p{\
-                    position: fixed;\
-                    width: 100%;\
-                    text-align: center;\
-                    pointer-events: none;\
-                    margin-top: 25px;\
+                    .pv-gallery-maximize-container+p:hover,.pv-gallery-maximize-container.checked+p:hover{\
+                    opacity: 1;\
                     }\
-                    .pv-gallery-maximize-container>p>input{\
+                    .pv-gallery-maximize-container.checked+p{\
+                    opacity: 0.8;\
+                    }\
+                    .pv-gallery-maximize-container+p>.need-checked{\
+                    display: none;\
+                    }\
+                    .pv-gallery-maximize-container.checked+p>.need-checked{\
+                    display: inline-block;\
+                    }\
+                    .pv-gallery-maximize-container+p>input{\
                     pointer-events: all;\
                     color: white;\
                     background-color: black;\
@@ -16704,10 +19860,14 @@ ImgOps | https://imgops.com/#b#`;
                     margin: 1px;\
                     font-size: 20px;\
                     }\
+                    .pv-gallery-maximize-container+p>input:hover{\
+                    color: red;\
+                    }\
                     .pv-gallery-maximize-container{\
-                    width: 100%;\
+                    min-width: 100%;\
                     display: block;\
                     background: black;\
+                    margin-left: 3px;\
                     }\
                     .pv-gallery-maximize-container.pv-gallery-flex-maximize{\
                     column-count: unset;\
@@ -16715,6 +19875,7 @@ ImgOps | https://imgops.com/#b#`;
                     -webkit-column-count: unset;\
                     display: flex;\
                     flex-flow: wrap;\
+                    justify-content: center;\
                     }\
                     .pv-gallery-maximize-container.pv-gallery-flex-maximize span{\
                     width: 18.5%;\
@@ -16745,19 +19906,33 @@ ImgOps | https://imgops.com/#b#`;
                     display: inline-block;\
                     vertical-align: middle;\
                     text-align: center;\
+                    background-color: rgba(40, 40, 40, 0.5);\
+                    border: 5px solid #000000;\
+                    font-size: 0px;\
+                    }\
+                    .pv-gallery-maximize-container>.maximizeChild:hover{\
+                    background: linear-gradient( 45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.4) 75%, rgba(255, 255, 255, 0.4) 100% ), linear-gradient( 45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.4) 75%, rgba(255, 255, 255, 0.4) 100% );\
+                    background-size: 20px 20px;\
+                    background-position: 0 0, 10px 10px;\
                     }\
                     .pv-gallery-maximize-container>.maximizeChild.selected{\
-                    border: 5px solid #ff0000;\
+                    border: 5px solid #ff000050;\
                     }\
                     .pv-gallery-maximize-container img{\
-                    width:100%;\
+                    max-width: 100%;\
                     transition: transform .3s ease 0s;\
                     transform: scale3d(1, 1, 1);\
                     cursor: zoom-in;\
+                    min-height: 150px;\
+                    border-radius: 20px;\
                     }\
-                    .pv-gallery-maximize-container img:hover {\
+                    .pv-gallery-maximize-container>.maximizeChild:hover img {\
                     transform: scale3d(1.1, 1.1, 1.1);\
-                    opacity: .9;\
+                    filter: brightness(1.1) !important;\
+                    opacity: 1;\
+                    }\
+                    .pv-gallery-maximize-container.pv-gallery-flex-maximize>.maximizeChild:hover img {\
+                    transform: translateY(-50%) scale3d(1.1, 1.1, 1.1);\
                     }\
                     .pv-gallery-maximize-container span>p{\
                     position: absolute;\
@@ -16765,13 +19940,14 @@ ImgOps | https://imgops.com/#b#`;
                     max-height: 40%;\
                     font-size: 18px;\
                     text-align: center;\
-                    background: #000;\
+                    background: #00000080;\
                     color: #fff;\
                     left: 0;\
                     user-select: none;\
                     word-break: break-all;\
                     display: inline;\
                     margin: 0 auto;\
+                    transition:all 0.2s;\
                     }\
                     .pv-gallery-maximize-container span>p.pv-bottom-banner{\
                     bottom: 0;\
@@ -16779,12 +19955,23 @@ ImgOps | https://imgops.com/#b#`;
                     cursor: pointer;\
                     line-height: 40px;\
                     }\
+                    .pv-gallery-maximize-container span>p.pv-bottom-banner>svg{\
+                    width: 20px;\
+                    height: 20px;\
+                    vertical-align: middle;\
+                    fill: currentColor;\
+                    overflow: hidden;\
+                    }\
                     .pv-gallery-maximize-container span>p.pv-top-banner{\
                     top: 0;\
                     height: 25px;\
+                    cursor: pointer;\
                     }\
                     .pv-gallery-maximize-container span:hover>p{\
-                    opacity: 0.6;\
+                    opacity: 1!important;\
+                    }\
+                    .pv-gallery-maximize-container span>p:hover{\
+                    background: #000000cc;\
                     }\
                     .pv-gallery-maximize-container span>p.pv-bottom-banner:hover{\
                     color:red;\
@@ -16793,11 +19980,20 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-maximize-container span>input{\
                     position: absolute;\
                     top: 2px;\
+                    z-index:1;\
                     width: 20px;\
                     height: 20px;\
                     opacity: 0;\
                     left: 0;\
                     display: inline;\
+                    cursor: pointer;\
+                    }\
+                    .pv-gallery-maximize-container.checked img,\
+                    .pv-gallery-maximize-container.checked p{\
+                    opacity: 0.3;\
+                    }\
+                    .pv-gallery-maximize-container.checked input:checked+img {\
+                    opacity: 1;\
                     }\
                     .pv-gallery-maximize-container.checked span>input{\
                     opacity: 1;\
@@ -16805,17 +20001,38 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-maximize-container.checked span>.pv-top-banner{\
                     opacity: 0.6;\
                     }\
+                    .pv-gallery-maximize-container.checked span>img{\
+                    cursor: pointer;\
+                    }\
+                    .pv-gallery-maximize-container+p>input{\
+                    width:min-content;\
+                    border: 1px solid transparent;\
+                    border-bottom-color: #a3a3a3;\
+                    }\
+                    .pv-gallery-maximize-container+p>input:hover{\
+                    border-color: white;\
+                    background: #333;\
+                    color: white;\
+                    }\
+                    .pv-gallery-maximize-container+p>input.compareBtn{\
+                    display: none;\
+                    }\
+                    .pv-gallery-maximize-container.canCompare+p>input.compareBtn{\
+                    display: inline;\
+                    }\
                     .pv-gallery-maximize-container span:hover>input{\
                     opacity: 1;\
                     }\
                     .pv-gallery-maximize-scroll{\
                     overflow-y: scroll;\
+                    overflow-x: hidden;\
                     height: 100%;\
                     width: 100%;\
                     position: absolute;\
-                    visibility: hidden;\
+                    display: none;\
                     top: 0;\
                     left: 0;\
+                    background: black;\
                     }\
                     .pv-gallery-sidebar-toggle:hover,.pv-gallery-sidebar-viewmore:hover{\
                     color:#ccc;\
@@ -16837,6 +20054,7 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-sidebar-viewmore-v{\
                     height:30px;\
                     top:6%;\
+                    top: calc(50% - 25px);\
                     }\
                     .pv-gallery-sidebar-toggle-top{\
                     top:-3px;\
@@ -16844,22 +20062,28 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-sidebar-viewmore-top{\
                     top:15px;\
                     }\
-                    .pv-gallery-sidebar-toggle-right,.pv-gallery-sidebar-viewmore-right{\
+                    .pv-gallery-sidebar-toggle-right{\
                     right:-3px;\
+                    }\
+                    .pv-gallery-sidebar-viewmore-right{\
+                    right:18px;\
                     }\
                     .pv-gallery-sidebar-toggle-bottom{\
                     bottom:-3px;\
                     }\
                     .pv-gallery-sidebar-viewmore-bottom{\
                     display: block;\
-                    background-color: #000000;\
-                    bottom:12px;\
+                    bottom:15px;\
                     }\
                     .pv-gallery-sidebar-viewmore-bottom.showmore{\
                     background-color: rgb(42, 42, 42);\
+                    opacity: 1;\
                     }\
-                    .pv-gallery-sidebar-toggle-left,.pv-gallery-sidebar-viewmore-left{\
+                    .pv-gallery-sidebar-toggle-left{\
                     left:-3px;\
+                    }\
+                    .pv-gallery-sidebar-viewmore-left{\
+                    left:18px;\
                     }\
                     span.pv-gallery-sidebar-toggle-content{\
                     display:inline-block;\
@@ -16867,23 +20091,26 @@ ImgOps | https://imgops.com/#b#`;
                     white-space:normal;\
                     word-wrap:break-word;\
                     overflow-wrap:break-word;\
-                    line-height:1.1;\
-                    font-size:12px;\
+                    line-height:16px;\
+                    font-size:18px;\
                     text-align:center;\
                     margin-bottom:8px;\
                     }\
-                    .pv-gallery-sidebar-viewmore-content{\
+                    span.pv-gallery-sidebar-viewmore-content{\
                     display:inline-block;\
                     vertical-align:middle;\
                     white-space:normal;\
                     word-wrap:break-word;\
                     overflow-wrap:break-word;\
-                    line-height:1.1;\
+                    line-height:1;\
                     font-size:16px;\
                     text-align:center;\
                     }\
                     .pv-gallery-sidebar-toggle-content-v,.pv-gallery-sidebar-viewmore-content-v{\
                     width:1.1em;\
+                    }\
+                    span.pv-gallery-sidebar-toggle-content-v{\
+                    line-height: 60px !important;\
                     }\
                     /*侧边栏开始*/\
                     .pv-gallery-sidebar-container {\
@@ -16891,7 +20118,7 @@ ImgOps | https://imgops.com/#b#`;
                     background-color:rgb(0,0,0);\
                     padding:5px;\
                     border:none;\
-                    margin:none;\
+                    margin:0;\
                     text-align:center;\
                     line-height:0;\
                     white-space:nowrap;\
@@ -16950,7 +20177,7 @@ ImgOps | https://imgops.com/#b#`;
                     border-top: 40px solid transparent;\
                     border-bottom: 40px solid transparent;\
                     }\
-                    .pv-gallery-sidebar-controler{\
+                    span.pv-gallery-sidebar-controler{\
                     cursor:pointer;\
                     position:absolute;\
                     background:rgba(255,255,255,0.1) no-repeat center;\
@@ -16970,19 +20197,19 @@ ImgOps | https://imgops.com/#b#`;
                     width:100%;\
                     height:36px;\
                     }\
-                    .pv-gallery-sidebar-controler-pre-h {\
+                    span.pv-gallery-sidebar-controler-pre-h {\
                     left: -40px;\
                     background-image: url("'+prefs.icons.arrowLeft+'");\
                     }\
-                    .pv-gallery-sidebar-controler-next-h {\
+                    span.pv-gallery-sidebar-controler-next-h {\
                     right: -40px;\
                     background-image: url("'+prefs.icons.arrowRight+'");\
                     }\
-                    .pv-gallery-sidebar-controler-pre-v {\
+                    span.pv-gallery-sidebar-controler-pre-v {\
                     top: -40px;\
                     background-image: url("'+prefs.icons.arrowTop+'");\
                     }\
-                    .pv-gallery-sidebar-controler-next-v {\
+                    span.pv-gallery-sidebar-controler-next-v {\
                     bottom: -40px;\
                     background-image: url("'+prefs.icons.arrowBottom+'");\
                     }\
@@ -17022,10 +20249,13 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-sidebar-thumbnails-container-left {\
                     padding-right:5px;\
                     }\
-                    .pv-gallery-sidebar-thumb-container {\
+                    span.pv-gallery-sidebar-thumb-container {\
                     display:inline-block;\
                     text-align: center;\
                     border:2px solid rgb(52,52,52);\
+                    background: linear-gradient( 45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.4) 75%, rgba(255, 255, 255, 0.4) 100% ), linear-gradient( 45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.4) 75%, rgba(255, 255, 255, 0.4) 100% );\
+                    background-size: 20px 20px;\
+                    background-position: 0 0, 10px 10px;\
                     cursor:pointer;\
                     position:relative;\
                     padding:2px;\
@@ -17037,6 +20267,9 @@ ImgOps | https://imgops.com/#b#`;
                     left:0;\
                     -webkit-transition:all 0.2s ease-in-out;\
                     transition:all 0.2s ease-in-out;\
+                    }\
+                    span.pv-gallery-sidebar-thumb-container.ignore {\
+                    opacity: 0.5;\
                     }\
                     .pv-gallery-sidebar-thumbnails-container-h  .pv-gallery-sidebar-thumb-container {\
                     margin:0 2px;\
@@ -17052,7 +20285,7 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-sidebar-thumb-container:hover {\
                     border:2px solid rgb(57,149,211);\
                     }\
-                    .pv-gallery-sidebar-thumb_selected {\
+                    span.pv-gallery-sidebar-thumb_selected {\
                     border:2px solid rgb(229,59,62);\
                     }\
                     .pv-gallery-sidebar-thumb_selected-top {\
@@ -17067,7 +20300,7 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-gallery-sidebar-thumb_selected-left {\
                     left:5px;\
                     }\
-                    .pv-gallery-sidebar-thumb-loading{\
+                    span.pv-gallery-sidebar-thumb-loading{\
                     position:absolute;\
                     top:0;\
                     left:0;\
@@ -17076,7 +20309,7 @@ ImgOps | https://imgops.com/#b#`;
                     height:100%;\
                     display:none;\
                     opacity:0.6;\
-                    background:black url("'+ prefs.icons.loading + '") no-repeat center ;\
+                    background:black url("' + prefs.icons.loading + '") no-repeat center ;\
                     }\
                     .pv-gallery-sidebar-thumb-loading:hover{\
                     opacity:0.8;\
@@ -17088,6 +20321,55 @@ ImgOps | https://imgops.com/#b#`;
                     max-height: 100% !important;\
                     height: auto !important;\
                     width: auto !important;\
+                    min-width: 10%;\
+                    min-height: 10%;\
+                    }\
+                    .pv-gallery-urls-textarea {\
+                    display: none;\
+                    position: fixed;\
+                    top: 10vh;\
+                    left: 10vw;\
+                    z-index: 100;\
+                    }\
+                    .pv-gallery-urls-textarea>textarea {\
+                    width: 80vw;\
+                    height: 80vh;\
+                    border: 10px solid #272727;\
+                    background: #ffffffee;\
+                    color: black;\
+                    text-wrap: nowrap;\
+                    }\
+                    span.pv-gallery-urls-textarea-close,\
+                    span.pv-gallery-urls-textarea-download{\
+                    height: 40px;\
+                    top: -25px;\
+                    background: #272727 no-repeat center;\
+                    color: white;\
+                    border-radius: 50%;\
+                    cursor: pointer;\
+                    }\
+                    span.pv-gallery-urls-textarea-close:hover,\
+                    span.pv-gallery-urls-textarea-download:hover {\
+                    background-color: black;\
+                    }\
+                    span.pv-gallery-urls-textarea-close {\
+                    position:absolute;\
+                    right: -25px;\
+                    width:40px;\
+                    background-image:url("'+prefs.icons.loadingCancle+'");\
+                    }\
+                    span.pv-gallery-urls-textarea-download {\
+                    position: absolute;\
+                    left: -25px;\
+                    width: 40px;\
+                    display: flex;\
+                    align-items: center;\
+                    justify-content: center;\
+                    }\
+                    span.pv-gallery-urls-textarea-download>svg {\
+                    height: 15px;\
+                    width: 15px;\
+                    fill: white;\
                     }\
                     .pv-gallery-vertical-align-helper{\
                     display:inline-block;\
@@ -17101,11 +20383,10 @@ ImgOps | https://imgops.com/#b#`;
                     white-space:nowrap;\
                     background-color:red;\
                     }\
-                    ';
-                var head=document.head;
-                head.appendChild(style);
-                this.globalSSheet=style.sheet;
+                    ');
+                this.globalSSheet=GalleryC.style.sheet;
 
+                var head=document.head;
                 var style2=document.createElement('style');
                 this.thumbVisibleStyle=style2;
                 style2.type='text/css';
@@ -17129,10 +20410,13 @@ ImgOps | https://imgops.com/#b#`;
                     var div=document.createElement('div');
                     div.className='pv-gallery-preloaded-img-container';
                     div.style.display='none';
-                    document.body.appendChild(div);
+                    getBody(document).appendChild(div);
                     GalleryC.prototype.Preload.prototype.container=div;
                 };
                 this.max=prefs.gallery.max;
+                if (prefs.gallery.downloadGap > 500) {
+                    this.max = 0;
+                }
                 this.nextNumber=0;
                 this.nextEle=this.ele;
                 this.preNumber=0;
@@ -17144,25 +20428,102 @@ ImgOps | https://imgops.com/#b#`;
                 if(!ele){
                     return;
                 };
+                this.waitForReady(ele);
+            },
+            waitForReady: function(ele) {
+                var self = this;
+                var beginLoadImg = () => {
+                    self.imgReady = imgReady(dataset(ele,'src'), {
+                        loadEnd: function(e) {
+                            if (self.aborted) {
+                                return;
+                            }
 
-                var self=this;
-                this.imgReady=imgReady(dataset(ele,'src'),{
-                    loadEnd:function(){
-                        if(self.aborted){
-                            return;
-                        };
-                        dataset(ele,'preloaded','true')
-                        self.container.appendChild(this);
-                        self.preload();
-                    },
-                    time:60 * 1000,//限时一分钟，否则强制结束并开始预读下一张。
-                });
+                            if (e.type == 'error') {
+                                var srcs = dataset(ele, 'srcs');
+                                if (srcs) srcs = srcs.split(",");
+                                if (srcs && srcs.length > 0) {
+                                    var src = srcs.shift();
+                                    dataset(ele, 'srcs', srcs.join(","));
+                                    if (src) {
+                                        dataset(ele, 'src', src);
+                                        self.waitForReady(ele);
+                                        return;
+                                    }
+                                }
+                            }
+
+                            dataset(ele,'preloaded','true');
+                            if (!dataset(ele,'naturalSize') && this.naturalHeight && this.naturalWidth) {
+                                dataset(ele,'naturalSize', JSON.stringify({
+                                    h: this.naturalHeight,
+                                    w: this.naturalWidth,
+                                }));
+                                let key = this.naturalWidth + "x" + this.naturalHeight;
+                                self.oriThis.sizeMap[key] = (self.oriThis.sizeMap[key] || 0) + 1;
+                                if (self.oriThis.sizeMap[key] === 2) {
+                                    let option = document.createElement("option");
+                                    option.innerText = key;
+                                    option.value = this.naturalWidth + "-" + this.naturalWidth + "x" + this.naturalHeight + "-" + this.naturalHeight;
+                                    self.oriThis.pinSize.appendChild(option);
+                                }
+                            }
+                            self.container.appendChild(this);
+                            self.preload();
+                        },
+                        time:60 * 1000,//限时一分钟，否则强制结束并开始预读下一张。
+                    });
+                };
+                var xhr = dataset(ele, 'xhr') !== 'stop' && this.oriThis.getPropBySpanMark(ele, 'xhr');
+                if (xhr) {
+                    var xhrError = function() {
+                        dataset(ele, 'xhr', 'stop');
+                        dataset(ele, 'src', dataset(ele, 'thumbSrc'));
+                        beginLoadImg();
+                    };
+                    xhrLoad.load({
+                        url: dataset(ele,'src'),
+                        xhr: xhr,
+                        cb: function(imgSrc, imgSrcs, caption, captions) {
+                            if (imgSrc) {
+                                dataset(ele, 'src', imgSrc);
+                                dataset(ele, 'xhr', 'stop');
+                                if (caption) dataset(ele, 'description', caption);
+                                beginLoadImg();
+                                if (imgSrcs && imgSrcs.length) {
+                                    let i = 0;
+                                    imgSrcs.forEach(src => {
+                                        if (src == imgSrc) return;
+                                        let img = document.createElement('img');
+                                        img.src = src;
+                                        let cap = captions && captions[i] ? captions[i] : caption;
+                                        imgReady(img,{
+                                            ready:function(){
+                                                let result = findPic(img);
+                                                if (cap) result.description = cap;
+                                                self.oriThis.data.push(result);
+                                                self.oriThis._appendThumbSpans([result]);
+                                                self.oriThis.loadThumb();
+                                            }
+                                        });
+                                        i++;
+                                    })
+                                }
+                            } else {
+                                xhrError();
+                            }
+                        },
+                        onerror: xhrError
+                    });
+                } else {
+                    beginLoadImg();
+                }
             },
             getPreloadEle:function(){
                 if((this.max<=this.nextNumber && this.max<=this.preNumber) || (!this.nextEle && !this.preEle)){
                     return;
                 };
-                var ele=this.direction=='pre'?  this.getNext() : this.getPrevious();
+                var ele=this.direction=='pre'? this.getNext() : this.getPrevious();
                 if(ele && !dataset(ele,'preloaded')){
                     return ele;
                 }else{
@@ -17218,14 +20579,14 @@ ImgOps | https://imgops.com/#b#`;
                         }break;
                         case track:{//轨道；功能，按住不放来连续滚动一个页面的距离
                             let pro=self.isHorizontal ? ['left','offsetX','layerX','clientWidth','offsetWidth'] : ['top' , 'offsetY' ,'layerY','clientHeight','offsetHeight'];
-                            var clickOffset=typeof e[pro[1]]=='undefined' ?  e[pro[2]] : e[pro[1]];
+                            var clickOffset=typeof e[pro[1]]=='undefined' ? e[pro[2]] : e[pro[1]];
                             var handleOffset=parseFloat(handle.style[pro[0]]);
                             var handleSize=handle[pro[4]];
                             var under= clickOffset > handleOffset ;//点击在滚动手柄的下方
                             var containerSize=self.container[pro[3]];
 
                             var scroll=function(){
-                                self.scrollBy(under?  (containerSize - 10) : (-containerSize + 10));//滚动一个页面距离少一点
+                                self.scrollBy(under? (containerSize - 10) : (-containerSize + 10));//滚动一个页面距离少一点
                             };
                             scroll();
 
@@ -17297,7 +20658,7 @@ ImgOps | https://imgops.com/#b#`;
                 this.scrollbar.bar.style.display='none';
             },
             scrollBy:function(distance,handleDistance){
-                return this.scroll(this.getScrolled() + (handleDistance?  distance / this.one :  distance));
+                return this.scroll(this.getScrolled() + (handleDistance? distance / this.one : distance));
             },
             scrollByPages:function(num){
                 this.scroll(this.getScrolled() + (this.container[(this.isHorizontal ? 'clientWidth' : 'clientHeight')] - 10) * num);
@@ -17307,7 +20668,7 @@ ImgOps | https://imgops.com/#b#`;
 
                 //滚动实际滚动条
                 var _distance=distance;
-                _distance=handleDistance?  distance / this.one :  distance;
+                _distance=handleDistance? distance / this.one : distance;
                 _distance=Math.max(0,_distance);
                 _distance=Math.min(_distance,this.scrollMax);
 
@@ -17359,7 +20720,7 @@ ImgOps | https://imgops.com/#b#`;
                 return noScroll;
             },
             getScrolled:function(){
-                return  this.container[(this.isHorizontal ? 'scrollLeft' : 'scrollTop')];
+                return this.container[(this.isHorizontal ? 'scrollLeft' : 'scrollTop')];
             },
         };
 
@@ -17383,7 +20744,7 @@ ImgOps | https://imgops.com/#b#`;
                 var container=document.createElement('span');
 
                 container.className='pv-magnifier-container';
-                document.body.appendChild(container);
+                getBody(document).appendChild(container);
 
                 this.magnifier=container;
 
@@ -17456,12 +20817,13 @@ ImgOps | https://imgops.com/#b#`;
                 this._pause=this.pause.bind(this);
                 this._zoom=this.zoom.bind(this);
                 this._clickOut=this.clickOut.bind(this);
+                this._keydown=this.keydown.bind(this);
 
-                if(prefs.magnifier.wheelZoom.enabled){
+                if (prefs.magnifier.wheelZoom.enabled || prefs.magnifier.wheelZoom.scaleImage !== false) {
                     this.zoomLevel=1;
                     this.defaultDia=diameter;
                     addWheelEvent(container,this._zoom,false);
-                };
+                }
 
                 container.addEventListener('mouseover',this._focus,false);
                 container.addEventListener('mouseout',this._blur,false);
@@ -17469,15 +20831,18 @@ ImgOps | https://imgops.com/#b#`;
                 container.addEventListener('click',this._pause,false);
 
 
+                document.addEventListener('keydown',this._keydown, true);
                 document.addEventListener('mousemove',this._move,true);
                 document.addEventListener('mouseup',this._clickOut,true);
             },
             addStyle:function(){
-                if(MagnifierC.style)return;
-                var style=document.createElement('style');
-                style.type='text/css';
-                MagnifierC.style=style;
-                style.textContent='\
+                if (MagnifierC.style) {
+                    if (!MagnifierC.style.parentNode) {
+                        MagnifierC.style = _GM_addStyle(MagnifierC.style.innerText);
+                    }
+                    return;
+                }
+                MagnifierC.style=_GM_addStyle('\
                     .pv-magnifier-container{\
                     position:absolute;\
                     padding:0;\
@@ -17494,12 +20859,11 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-magnifier-container_pause{\
                     border-color:red;\
                     }\
-                    ';
-                document.head.appendChild(style);
+                    ');
             },
-            clickOut:function(){
+            clickOut:function(e){
                 if(!this.magnifier.classList.contains("pv-magnifier-container_focus")){
-                    this.remove();
+                    this.remove(e);
                 }
             },
             focus:function(){
@@ -17544,25 +20908,55 @@ ImgOps | https://imgops.com/#b#`;
                 var level;
                 var self=this;
                 if(this.zoomOut){//缩小
-                    MagnifierC.zoomRangeR._find(function(value){
+                    let found = MagnifierC.zoomRangeR.find(function(value){
                         if(value < self.zoomLevel){
                             level=value;
                             return true;
                         }
                     })
+                    if (!found) {
+                        level = self.zoomLevel * 0.9;
+                    }
                 }else{
-                    MagnifierC.zoomRange._find(function(value){
+                    let found = MagnifierC.zoomRange.find(function(value){
                         if(value > self.zoomLevel){
                             level=value;
                             return true;
                         };
                     });
+                    if (!found) {
+                        level = self.zoomLevel * 1.1;
+                    }
                 }
                 return level;
             },
             zoom:function(e){
+                if ((e.metaKey != !!prefs.magnifier.wheelZoom.meta) ||
+                   (e.altKey != !!prefs.magnifier.wheelZoom.alt) ||
+                   (e.ctrlKey != !!prefs.magnifier.wheelZoom.ctrl) ||
+                   (e.shiftKey != !!prefs.magnifier.wheelZoom.shift)) {
+                    return;
+                }
                 if(e.deltaY===0)return;//非Y轴的滚动
-                if(prefs.magnifier.wheelZoom.pauseFirst && !this.paused)return;
+                var ms=this.magnifier.style;
+                if(prefs.magnifier.wheelZoom.pauseFirst && !this.paused){
+                    if (prefs.magnifier.wheelZoom.scaleImage !== false) {
+                        let curScale = ms.transform.match(/[\d\.]+/);
+                        if (curScale) {
+                            curScale = parseFloat(curScale[0]);
+                        } else curScale = 1;
+                        if (e.deltaY < 0) {
+                            curScale += 0.1;
+                        } else {
+                            curScale -= 0.1;
+                        }
+                        if (curScale < 0.5) curScale = 0.5;
+                        ms.transform = `scale(${curScale})`;
+                        e.preventDefault();
+                    }
+                    return;
+                }
+                if(!prefs.magnifier.wheelZoom.enabled)return;
                 e.preventDefault();
                 if(e.deltaY < 0){//向上滚，放大；
                     if(this.diameter >= this.maxDia)return;
@@ -17584,7 +20978,6 @@ ImgOps | https://imgops.com/#b#`;
                 var bRadius=this.radius;
                 this.radius=radius;
                 this.setMouseRange();
-                var ms=this.magnifier.style;
                 ms.width=diameter+'px';
                 ms.height=diameter+'px';
                 ms.borderRadius=radius+1 + 'px';
@@ -17612,25 +21005,43 @@ ImgOps | https://imgops.com/#b#`;
                     y:[imgRange.y[0]-radius , imgRange.y[1] + radius],
                 };
             },
+            keydown:function(e){
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.keyCode == 27) this.remove();
+                }
+            },
             remove:function(e){
-                e.preventDefault();
-                e.stopPropagation();
-                this.magnifier.parentNode.removeChild(this.magnifier);
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                if (this.magnifier.parentNode) {
+                    this.magnifier.parentNode.removeChild(this.magnifier);
+                    MagnifierC.all.splice(MagnifierC.all.indexOf(this),1);
+                }
                 document.removeEventListener('mousemove',this._move,true);
-                MagnifierC.all.splice(MagnifierC.all.indexOf(this),1);
+                document.removeEventListener('mouseup',this._clickOut,true);
+                document.removeEventListener('keydown',this._keydown, true);
             },
         };
 
         //图片窗口
-        function ImgWindowC(img, data){
-            this.loaded=false;
-            this.img=img;
-            this.src=data?data.src:img.src;
-            this.data = data;
-
+        function ImgWindowC(img, data, actual, initPos, preview){
+            this.loaded = false;
+            this.img = img;
+            this.actual = !!actual;
+            this.src = data?data.src:img.src;
+            this.data = data || findPic(img);
+            this.initPos = initPos || false;
+            this.preview = !!preview;
+            this.isImg = this.img.nodeName.toUpperCase() == 'IMG';
+            this.imgSizeBytes = null;
+            this.imgSizeText = "";
             this.init();
-            if(data){
-                this.img.src = location.protocol == "https"?data.src.replace(/^http:/,"https:"):data.src;
+            if (data && this.isImg) {
+                this.img.src = location.protocol == "https" ? data.src.replace(/^http:/,"https:") : data.src;
             }
         };
 
@@ -17640,24 +21051,27 @@ ImgOps | https://imgops.com/#b#`;
 
         ImgWindowC.prototype={
             init:function(){
+                ImgWindowC.showing = true;
                 ImgWindowC.zoomRange=prefs.imgWindow.zoom.range.slice(0).sort((a, b)=>{return a - b});
                 ImgWindowC.zoomRangeR=ImgWindowC.zoomRange.slice(0).reverse();//降序
                 var self=this;
                 if(uniqueImgWin && !uniqueImgWin.removed){
                     uniqueImgWin.remove();
                 }
-                //图片是否已经被打开
-                if(ImgWindowC.all._find(function(iwin){
-                    if(iwin.src==self.src){
-                        iwin.firstOpen();
-                        return true;
-                    };
-                }))return;
+                if (!this.preview) {
+                    //图片是否已经被打开
+                    if(ImgWindowC.all.find(function(iwin){
+                        if(iwin.src==self.src){
+                            iwin.firstOpen();
+                            return true;
+                        };
+                    }))return;
+                }
 
                 this.addStyle();
 
                 var img=this.img;
-                img.className='pv-pic-window-pic pv-pic-ignored transition-transform';
+                img.className='pv-pic-window-pic pv-pic-ignored';
                 img.style.cssText='\
                  top:0px;\
                  left:0px;\
@@ -17668,16 +21082,19 @@ ImgOps | https://imgops.com/#b#`;
                     w:img.naturalWidth,
                 };
                 this.imgNaturalSize=imgNaturalSize;
+                this.following=false;
 
                 var container=document.createElement('span');
                 container.style.cssText='\
                  cursor:pointer;\
                  top:0px;\
                  left:0px;\
-                 opacity:0\
+                 opacity:0;\
+                 background:black url("'+prefs.icons.loading+'") center no-repeat;\
                  ';
                 container.className='pv-pic-window-container';
-                container.innerHTML=createHTML(
+                setHTML(container,
+                    '<span class="pv-pic-window-imgbox transition-transform"></span>'+
                     '<span class="pv-pic-window-rotate-indicator">'+
                     '<span class="pv-pic-window-rotate-indicator-pointer"></span>'+
                     '</span>'+
@@ -17685,7 +21102,7 @@ ImgOps | https://imgops.com/#b#`;
                     '<span class="pv-pic-window-toolbar" unselectable="on">'+
                     '<span class="pv-pic-window-tb-hand pv-pic-window-tb-tool" title="'+i18n("hand")+'"></span>'+
                     '<span class="pv-pic-window-tb-tool-badge-container pv-pic-window-tb-tool-extend-menu-container">'+
-                    '<span class="pv-pic-window-tb-rotate pv-pic-window-tb-tool" title="'+i18n("rotate")+'"></span>'+
+                    '<span class="pv-pic-window-tb-rotate pv-pic-window-tb-tool" title="'+i18n("rotate")+'(r)"></span>'+
                     '<span class="pv-pic-window-tb-tool-badge">0</span>'+
                     '<span class="pv-pic-window-tb-tool-extend-menu pv-pic-window-tb-tool-extend-menu-rotate">'+
                     '<span class="pv-pic-window-tb-tool-extend-menu-item" title="+90"><svg class="icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4332"><path d="M435.2 362.666667l179.2-179.2L435.2 0 375.466667 59.733333l76.8 76.8H341.333333c-119.466667 0-213.333333 93.866667-213.333333 213.333334v170.666666h85.333333v-170.666666c0-72.533333 55.466667-128 128-128h115.2L375.466667 302.933333l59.733333 59.733334zM853.333333 384H426.666667c-25.6 0-42.666667 17.066667-42.666667 42.666667v426.666666c0 25.6 17.066667 42.666667 42.666667 42.666667h426.666666c25.6 0 42.666667-17.066667 42.666667-42.666667V426.666667c0-25.6-17.066667-42.666667-42.666667-42.666667z m-42.666666 426.666667h-341.333334v-341.333334h341.333334v341.333334z" p-id="4333"></path></svg></span>'+
@@ -17694,7 +21111,7 @@ ImgOps | https://imgops.com/#b#`;
                     '</span>'+
                     '</span>'+
                     '<span class="pv-pic-window-tb-tool-badge-container pv-pic-window-tb-tool-extend-menu-container">'+
-                    '<span class="pv-pic-window-tb-zoom pv-pic-window-tb-tool" title="'+i18n("scale")+'"></span>'+
+                    '<span class="pv-pic-window-tb-zoom pv-pic-window-tb-tool" title="'+i18n("scale")+'(z)"></span>'+
                     '<span class="pv-pic-window-tb-tool-badge">0</span>'+
                     '<span class="pv-pic-window-tb-tool-extend-menu pv-pic-window-tb-tool-extend-menu-zoom">'+
                     '<span id="pv-pic-zoom-in" class="pv-pic-window-tb-tool-extend-menu-item" title="+0.1"><svg class="icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3134"><path d="M754.2 151.5h-89.5v42.7h89.5c59.5 0 108 48.4 108 108v67.6h42.7v-67.6c0-83.1-67.6-150.7-150.7-150.7zM862.2 737.3c0 59.5-48.4 108-108 108h-89.5V888h89.5c83.1 0 150.7-67.6 150.7-150.7v-67.6h-42.7v67.6zM166.3 737.8v-67.6h-42.7v67.6c0 83.1 67.6 150.7 150.7 150.7h89.5v-42.7h-89.5c-59.5 0-108-48.4-108-108zM416.3 261.8h-42.8v126H247.6v42.7h125.9V556h42.8V430.5h125.4v-42.7H416.3zM773.6 789.4l30.2-30.2-190.1-190.6c32.7-44.8 52-99.9 52-159.5 0-149.7-121.6-271.3-271.3-271.3-149.3 0-271.3 121.6-271.3 271.3 0 149.3 121.5 271.3 271.3 271.3 74.5 0 142.3-30.3 191.4-79.3l187.8 188.3zM394.4 637.7c-126 0-228.6-102.5-228.6-228.6s102.5-228.6 228.6-228.6S623 283.1 623 409.2 520.5 637.7 394.4 637.7z" p-id="3135"></path></svg></span>'+
@@ -17704,15 +21121,23 @@ ImgOps | https://imgops.com/#b#`;
                     '</span>'+
                     '<span class="pv-pic-window-tb-flip-horizontal pv-pic-window-tb-command" title="'+i18n("horizontalFlip")+'"></span>'+
                     '<span class="pv-pic-window-tb-flip-vertical pv-pic-window-tb-command" title="'+i18n("verticalFlip")+'"></span>'+
+                    '<span class="pv-pic-window-tb-compare pv-pic-window-tb-command" title="'+i18n("compareBtn")+'"></span>'+
                     '</span>'+
-                    '<span class="pv-pic-window-max"></span>' +
+                    '<span class="pv-pic-window-max"  title="'+i18n("gallery")+'(g)"></span>' +
                     '<span class="pv-pic-window-close"></span>' +
+                    '<svg class="pv-pic-window-scrollSign" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><ellipse ry="501.5" rx="331.5" cy="510.78408" cx="514.68283" stroke="#000" fill="#fff"/><path d="M512 212.468019m-43.132605 0a43.132605 43.132605 0 1 0 86.26521 0 43.132605 43.132605 0 1 0-86.26521 0ZM512 383.400936m-43.132605 0a43.132605 43.132605 0 1 0 86.26521 0 43.132605 43.132605 0 1 0-86.26521 0ZM512 554.333853m-43.132605 0a43.132605 43.132605 0 1 0 86.26521 0 43.132605 43.132605 0 1 0-86.26521 0ZM609.447738 651.781591L512 749.229329l-97.447738-97.447738c-17.572543-17.572543-43.132605-17.572543-59.107644 0s-17.572543 43.132605 0 59.107645l127.800312 127.800312c7.98752 7.98752 20.767551 12.780031 30.352574 12.780031s20.767551-4.792512 30.352574-12.780031l127.800312-127.800312c17.572543-17.572543 17.572543-43.132605 0-59.107645-19.170047-17.572543-44.730109-17.572543-62.302652 0zM555.132605 0h-84.667706C302.726989 0 171.731669 132.592824 171.731669 298.733229v426.533542c0 166.140406 132.592824 298.733229 298.73323 298.733229h84.667706c166.140406 0 298.733229-132.592824 298.73323-298.733229V298.733229C852.268331 132.592824 721.273011 0 555.132605 0zM767.600624 723.669267c0 119.812793-94.25273 212.468019-212.468019 212.468018h-84.667706c-119.812793 0-212.468019-94.25273-212.468019-212.468018V298.733229c0-119.812793 94.25273-212.468019 212.468019-212.468018h84.667706c119.812793 0 212.468019 94.25273 212.468019 212.468018v424.936038z"></path></svg>' +
                     //'<span class="pv-pic-window-search" title="'+i18n("similarImage")+'"></span>' +
                     '<span class="pv-pic-window-range"></span>' +
                     '<span class="pv-pic-window-description"></span>'+
-                    '<span class="pv-pic-search-state"></span>');
+                    '<span class="pv-pic-window-pre"></span>'+
+                    '<span class="pv-pic-window-next"></span>'+
+                    '<span class="pv-pic-search-state">'+
+                    '<span></span>'+prefs.icons.downloadSvgBtn+
+                    '</span>');
 
-                container.insertBefore(img,container.firstChild);
+                let imgbox=container.firstChild;
+                imgbox.appendChild(img);
+                this.imgbox = imgbox;
 
                 this.imgWindow=container;
 
@@ -17722,42 +21147,78 @@ ImgOps | https://imgops.com/#b#`;
                     'zoom':container.querySelector('.pv-pic-window-tb-zoom'),
                     'fh':container.querySelector('.pv-pic-window-tb-flip-horizontal'),
                     'fv':container.querySelector('.pv-pic-window-tb-flip-vertical'),
+                    'compare':container.querySelector('.pv-pic-window-tb-compare')
                 };
                 this.toolMap=toolMap;
 
+                var preButton=container.querySelector('.pv-pic-window-pre');
+                preButton.addEventListener('click',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    self.switchImage(false);
+                },false);
+                var nextButton=container.querySelector('.pv-pic-window-next');
+                nextButton.addEventListener('click',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    self.switchImage(true);
+                },false);
+                if (gallery && (gallery.shown || gallery.minimized)) {
+                    preButton.style.display = "none";
+                    nextButton.style.display = "none";
+                }
+                this.imgStateBox = container.querySelector('.pv-pic-search-state');
+                this.imgState = container.querySelector('.pv-pic-search-state>span');
+                this.preButton = container.querySelector('.pv-pic-window-pre');
+                this.nextButton = container.querySelector('.pv-pic-window-next');
+                let downloadIcon = container.querySelector('.pv-pic-search-state>svg');
+                downloadIcon && downloadIcon.addEventListener('click', function(e) {
+                    if (!self.data || !self.img) {
+                        debug(self);
+                        return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+                        _GM_openInTab(self.img.src, {active:false});
+                    } else {
+                        downloadImg(self.img.src, (self.data.img.title || self.data.img.alt), prefs.saveName, null, self.data);
+                    }
+                }, true);
 
                 //关闭
                 var closeButton=container.querySelector('.pv-pic-window-close');
-                closeButton.style.cssText='top: -24px;right: 0px;';
+                closeButton.style.cssText='top: -22px;right: 0px;';
                 this.closeButton=closeButton;
                 closeButton.addEventListener('click',function(e){
                     self.remove();
                 },false);
 
+
                 var maxButton=container.querySelector('.pv-pic-window-max');
-                maxButton.style.cssText='top: -24px;right: 46px;';
+                maxButton.style.cssText='top: -22px;right: 46px;';
                 this.maxButton=maxButton;
-                maxButton.addEventListener('click',function(e){
+                maxButton.addEventListener('click',async function(e){
                     if(!gallery){
                         gallery=new GalleryC();
                         gallery.data=[];
                     }
-                    var allData=gallery.getAllValidImgs();
-                    if(allData.length<1)return;
-                    allData.target={src:img.src};
+                    var allData=await gallery.getAllValidImgs();
+                    allData.target = self.data;
                     gallery.data=allData;
                     gallery.load(gallery.data);
                     self.remove();
                 },false);
 
                 //var searchButton=container.querySelector('.pv-pic-window-search');
-                //searchButton.style.cssText='top: -24px;right: 50px;';
+                //searchButton.style.cssText='top: -22px;right: 50px;';
                 //this.searchButton=searchButton;
                 var srcs, from;
                 img.onerror=function(e){
                     //setSearchState(i18n("loadNextSimilar"),img.parentNode);
+                    if(self.removed || !self.isImg)return;
                     console.info(img.src+" "+i18n("loadError"));
-                    if(self.removed || !self.data)return;
+                    if(!self.data)return;
                     var src;
                     if(self.data.srcs)
                         src=self.data.srcs.shift();
@@ -17774,44 +21235,88 @@ ImgOps | https://imgops.com/#b#`;
                                 self.img.src=srcs.shift();
                             },null,null,from);
                         }else{
-                            setSearchState(i18n("findNoPic"),img.parentNode);
+                            setSearchState(i18n("findNoPic"), self.imgState);
                             setTimeout(function(){
-                                setSearchState("",img.parentNode);
+                                setSearchState("", self.imgState);
                             },2000);
                         }
                     }
                 };
-                img.onload=function(e){
-                    if(self.removed)return;
-                    self.loaded=true;
-                    if(img.naturalHeight ==1 && img.naturalWidth ==1){
+                this.curIndex = -1;
+                if (this.data && this.data.all && this.data.all.length > 1) {
+                    for (let i = 0; i < this.data.all.length; i++) {
+                        if (this.data.src.indexOf(this.data.all[i].replace(/^(video|audio):/, "")) !== -1) {
+                            this.curIndex = i;
+                            break;
+                        }
+                    }
+                }
+                img.onload = function(e) {
+                    if (self.removed) return;
+                    self.loaded = true;
+                    self.imgSizeBytes = null;
+                    self.imgSizeText = "";
+                    container.style.background='';
+                    if (self.preview && img.naturalHeight == 1 && img.naturalWidth == 1) {
                         self.remove();
                         return;
                     }
-                    //self.imgWindow.classList.remove("pv-pic-window-transition-all");
-                    self.imgWindow.style.display="";
-                    setSearchState(img.naturalWidth+" x "+img.naturalHeight,img.parentNode);
-                    self.imgNaturalSize={
+                    self.imgWindow.style.display = "";
+                    self.imgNaturalSize = {
                         h:img.naturalHeight,
                         w:img.naturalWidth,
                     };
-                    if(self.imgWindow.style.overflow!="scroll"){
-                        self.zoomLevel=0;
-                        self.zoom(1);
+                    self.setToolBadge('zoom',self.zoomLevel);
+                    self.fetchImgSize(self.img.src, 'auto');
+                    if (self==uniqueImgWin && prefs.floatBar.globalkeys.previewFollowMouse) {
+                        self.followPos(uniqueImgWinInitX, uniqueImgWinInitY);
+                    } else {
+                        if (!self.zoomed) {
+                            if (!self.imgWindow.classList.contains("pv-pic-window-scroll")) {
+                                self.zoomLevel=0;
+                                if (img.naturalHeight && img.naturalHeight < 100) {
+                                    let zoomLevel = 100 / img.naturalHeight;
+                                    self.zoom(zoomLevel);
+                                } else {
+                                    self.zoom(1);
+                                }
+                            }
+                            if (self == uniqueImgWin) {
+                                self.initMaxSize();
+                            }
+                            if (prefs.imgWindow.fitToScreen) {
+                                self.fitToScreen();
+                            }
+                            if (self.initPos) {
+                                self.imgWindow.style.left = self.initPos.left;
+                                self.imgWindow.style.top = self.initPos.top;
+                            } else self.center(true, true);
+                        }
                     }
-                    if(prefs.imgWindow.fitToScreen)
-                        self.fitToScreen();
-                    self.center(true,true);
-                    self.imgWindow.style.opacity=1;
+                    self.imgWindow.style.opacity = 1;
                     self.keepScreenInside();
 
-                    var wSize=getWindowSize();
+                    var wSize = getWindowSize();
                     wSize.h -= 16;
                     wSize.w -= 16;
-                    self.isLongImg=self.imgNaturalSize.h >= wSize.h && self.imgNaturalSize.h/self.imgNaturalSize.w > 3.5;
+                    self.isLongImg = self.imgNaturalSize.h >= wSize.h && self.imgNaturalSize.h / self.imgNaturalSize.w > 2.5;
                 }
-                if(imgNaturalSize.h && imgNaturalSize.w){
-                    setSearchState(img.naturalWidth+" x "+img.naturalHeight,img.parentNode);
+                if (imgNaturalSize.h && imgNaturalSize.w) {
+                    container.style.background='';
+                    self.updateImgState(1);
+                    self.fetchImgSize(self.img.src, 'auto');
+                }
+                if (!this.isImg) {
+                    if (/^video$/i.test(img.nodeName)) {
+                        img.naturalHeight = img.videoHeight || 1080;
+                        img.naturalWidth = img.videoWidth || 1920;
+                    } else if (/^audio$/i.test(img.nodeName)) {
+                        img.naturalHeight = 50;
+                        img.naturalWidth = 350;
+                    }
+                    setTimeout(() => {
+                        img.onload();
+                    }, 0);
                 }
                 /*searchButton.addEventListener('click',function(e){
                     sortSearch();
@@ -17829,20 +21334,24 @@ ImgOps | https://imgops.com/#b#`;
                 */
                 if (this.data) {
                     var descriptionSpan = container.querySelector('.pv-pic-window-description');
-                    // descriptionSpan.style.cssText = '\
-                    //  bottom: -40px;\
-                    //  left: 10px;\
-                    // ';
-                    descriptionSpan.textContent = this.data.description || '';
-                    // descriptionSpan.style.display = this.data.description ? 'block' : 'none';
-                    descriptionSpan.style.display = 'none';
+                    let desc = (this.data.description || '');
+                    if (Array.isArray(this.data.description) && Array.isArray(this.data.all)) {
+                        let curIndex;
+                        for (curIndex = 0; curIndex < this.data.all.length; curIndex++) {
+                            if (this.data.src.indexOf(this.data.all[curIndex].replace(/^(video|audio):/, "")) !== -1) break;
+                        }
+                        desc = desc[curIndex] || desc[0] || "";
+                    }
+                    descriptionSpan.textContent = desc.trim();
+                    this.imgStateBox.title = desc;
+                    descriptionSpan.style.display = desc ? "inline" : "none";
                     this.descriptionSpan = descriptionSpan;
                 }
 
                 var toolbar=container.querySelector('.pv-pic-window-toolbar');
                 toolbar.style.cssText='\
                 top: 0px;\
-                left: -45px;\
+                left: -42px;\
                 ';
                 this.toolbar=toolbar;
 
@@ -17922,6 +21431,11 @@ ImgOps | https://imgops.com/#b#`;
                     self.toolbarEventHandler(e);
                 },false);
 
+                toolbar.addEventListener('click',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                },false);
+
 
                 toolbar.addEventListener('dblclick',function(e){//鼠标双击工具
                     self.toolbarEventHandler(e);
@@ -17933,6 +21447,24 @@ ImgOps | https://imgops.com/#b#`;
                     e.preventDefault();
                 },false);
 
+                let hideToolbarTimer = setTimeout(() => {
+                    if (this !== uniqueImgWin) {
+                        container.classList.add("hideToolbar");
+                    }
+                }, 800);
+                imgbox.addEventListener('mousemove',function(e){
+                    e.preventDefault();
+                    clearTimeout(hideToolbarTimer);
+                    container.classList.remove("hideToolbar");
+                    hideToolbarTimer = setTimeout(() => {
+                        container.classList.add("hideToolbar");
+                    }, 800);
+                },false);
+                imgbox.addEventListener('mouseleave',function(e){
+                    e.preventDefault();
+                    clearTimeout(hideToolbarTimer);
+                    container.classList.remove("hideToolbar");
+                },false);
 
                 container.addEventListener('mousedown',function(e){//当按下的时，执行平移，缩放，旋转操作
                     self.imgWindowEventHandler(e);
@@ -17940,7 +21472,7 @@ ImgOps | https://imgops.com/#b#`;
 
                 container.addEventListener('touchstart',function(e){//当按下的时，执行平移，缩放，旋转操作
                     self.imgWindowEventHandler(e);
-                },false);
+                },{ passive: true, capture: false });
 
                 container.addEventListener('click',function(e){//阻止opera ctrl+点击保存图片
                     self.imgWindowEventHandler(e);
@@ -17948,7 +21480,16 @@ ImgOps | https://imgops.com/#b#`;
 
                 if(prefs.imgWindow.zoom.mouseWheelZoom){//是否使用鼠标缩放
                     addWheelEvent(container,function(e){//滚轮缩放
+                        if (e.target && (e.target.className == "pv-pic-window-next" || e.target.className == "pv-pic-window-pre")) {
+                            e.preventDefault && e.preventDefault();
+                            return;
+                        }
                         self.imgWindowEventHandler(e);
+                        clearTimeout(hideToolbarTimer);
+                        container.classList.remove("hideToolbar");
+                        hideToolbarTimer = setTimeout(() => {
+                            container.classList.add("hideToolbar");
+                        }, 800);
                     },false);
                 };
 
@@ -17960,6 +21501,7 @@ ImgOps | https://imgops.com/#b#`;
                         var target=e.target;
                         if(!container.contains(target)){
                             self.remove();
+                            document.removeEventListener(prefs.imgWindow.close.clickOutside,clickOutside,true);
                         };
                     };
                     this.clickOutside=clickOutside;
@@ -17970,17 +21512,19 @@ ImgOps | https://imgops.com/#b#`;
                 if(prefs.imgWindow.close.dblClickImgWindow){
                     var dblClickImgWindow=function(e){
                         var target=e.target;
-                        if(target==container || target==img || target==self.rotateOverlayer){
+                        if(target==container || target==img || target==self.imgState || target==self.rotateOverlayer){
                             self.remove();
+                            e.stopPropagation();
                         };
                         e.preventDefault();
-                        e.stopPropagation();
                     };
                     container.addEventListener('dblclick',dblClickImgWindow,true);
                 };
 
 
-                ImgWindowC.all.push(this);
+                if (!this.preview) {
+                    ImgWindowC.all.push(this);
+                }
 
                 this._blur=this.blur.bind(this);
                 this._focusedKeydown=this.focusedKeydown.bind(this);
@@ -17994,16 +21538,22 @@ ImgOps | https://imgops.com/#b#`;
                         overlayer.className='pv-pic-window-overlayer';
                     };
                     overlayer.style.backgroundColor=prefs.imgWindow.overlayer.color;
-                    document.body.appendChild(overlayer);
+                    getBody(document).appendChild(overlayer);
                     overlayer.style.display='block';
                 };
                 if(prefs.imgWindow.backgroundColor){
                     this.imgWindow.style.backgroundColor=prefs.imgWindow.backgroundColor;
                 }
-                document.body.appendChild(container);
+
+                if (gallery && gallery.shown) {
+                    document.documentElement.appendChild(container);
+                } else {
+                    getBody(document).appendChild(container);
+                }
 
                 this.rotatedRadians=0;//已经旋转的角度
-                this.zoomLevel=1;//缩放级别
+                this.zoomLevel=0;
+                this.zoom(1);
                 this.setToolBadge('zoom',1);
 
                 this.firstOpen();
@@ -18012,9 +21562,240 @@ ImgOps | https://imgops.com/#b#`;
                 //选中默认工具
                 this.selectTool(prefs.imgWindow.defaultTool);
             },
+            geneCompareImg: function(src, percent) {
+                let parent = document.createElement("div");
+                let compareImgCon = document.createElement("div");
+                compareImgCon.className = "compareImgCon";
+                let compareImg = document.createElement("img");
+                let compareSlider = document.createElement("div");
+                compareSlider.className = "compareSlider";
+                compareSlider.title = "Right mouse to bottom, hold to top";
+                compareImgCon.style.width = percent + "%";
+                compareSlider.style.left = percent + "%";
+                let compareSliderButton = document.createElement("button");
+                let self = this;
+                let upTimer, initLeft;
+                let mouseMoveHandler = e => {
+                    if (upTimer && Math.abs(initLeft - e.pageX) > 10) {
+                        clearTimeout(upTimer);
+                        upTimer = null;
+                    }
+                    if (compareSliderButton.style.display == "") {
+                        document.removeEventListener("mousemove", mouseMoveHandler);
+                        document.removeEventListener("touchmove", mouseMoveHandler);
+                        return;
+                    }
+                    e = (e.changedTouches) ? e.changedTouches[0] : e;
+                    let a = self.img.getBoundingClientRect();
+                    let x = e.pageX - a.left;
+                    x = x - window.pageXOffset;
+                    if (x < 0) x = 0;
+                    if (x > a.width) x = a.width;
+                    compareImgCon.style.width = x / a.width * 100 + "%";
+                    compareSlider.style.left = x / a.width * 100 + "%";
+                };
+                let beginSlide = e => {
+                    compareSliderButton.style.display = "none";
+                    initLeft = e.pageX;
+                    clearTimeout(upTimer);
+                    upTimer = setTimeout(() => {
+                        self.compareBox.appendChild(parent);
+                    }, 1000);
+                    document.addEventListener("mousemove", mouseMoveHandler);
+                    document.addEventListener("touchmove", mouseMoveHandler);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    let mouseUpHandler = e => {
+                        clearTimeout(upTimer);
+                        compareSliderButton.style.display = "";
+                        document.removeEventListener("mousemove", mouseMoveHandler);
+                    };
+                    document.addEventListener("mouseup", mouseUpHandler);
+                    document.addEventListener("touchend", mouseUpHandler);
+                };
+                compareSlider.addEventListener("mousedown", beginSlide);
+                compareSlider.addEventListener("contextmenu", e => {
+                    self.compareBox.insertBefore(parent, self.compareBox.firstChild);
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+                compareSlider.addEventListener("touchstart", beginSlide);
+                compareSlider.appendChild(compareSliderButton);
+                compareImg.src = src;
+                compareImgCon.appendChild(compareImg);
+                parent.appendChild(compareImgCon);
+                parent.appendChild(compareSlider);
+                return parent;
+            },
+            compare: function(otherSrcs) {
+                if (!otherSrcs || otherSrcs.length === 0) return;
+                if (!this.compareBox) {
+                    let compareBox = document.createElement("div");
+                    compareBox.className = "compareBox";
+                    this.compareBox = compareBox;
+                    this.img.parentNode.appendChild(compareBox);
+                    this.imgWindow.classList.add("compare");
+                }
+                setHTML(this.compareBox, "");
+                let self = this, count = 0, compareImgConList = [], targetCompareImg;
+                otherSrcs.forEach(src => {
+                    count++;
+                    let percent = 100 - count * (100 / (otherSrcs.length + 1));
+                    let compareImg = self.geneCompareImg(src, percent);
+                    self.compareBox.appendChild(compareImg);
+                    compareImgConList.unshift(compareImg.children[0]);
+                });
+                this.img.addEventListener("mousedown", e => {
+                    targetCompareImg = null;
+                    let percentX = e.offsetX / self.img.clientWidth * 100;
+                    for (let i = 0; i < compareImgConList.length; i++) {
+                        let compareImgCon = compareImgConList[i];
+                        let compareWidth = parseInt(compareImgCon.style.width);
+                        if (percentX < compareWidth) {
+                            targetCompareImg = compareImgCon;
+                            targetCompareImg.style.opacity = 0;
+                            break;
+                        }
+                    }
+                    if (targetCompareImg == null) {
+                        self.img.style.opacity = 0;
+                        compareImgConList[compareImgConList.length - 1].style.overflow = "visible";
+                    }
+                });
+                this.img.addEventListener("mouseup", e => {
+                    if (targetCompareImg) {
+                        targetCompareImg.style.opacity = "";
+                    } else {
+                        self.img.style.opacity = "";
+                        compareImgConList[compareImgConList.length - 1].style.overflow = "";
+                    }
+                });
+                this.preButton.style.display = "none";
+                this.nextButton.style.display = "none";
+            },
+            switchImage:async function(fw){
+                if (this.data && this.data.all && this.data.all.length > 1) {
+                    let initPos = prefs.imgWindow.switchStoreLoc ? {left: this.imgWindow.style.left, top: this.imgWindow.style.top} : false;
+                    this.remove();
+                    let imgData = this.data;
+                    let curIndex;
+                    for (curIndex = 0; curIndex < this.data.all.length; curIndex++) {
+                        if (this.data.src.indexOf(this.data.all[curIndex].replace(/^(video|audio):/, "")) !== -1) break;
+                    }
+                    if (fw) {
+                        curIndex++;
+                        if (curIndex == this.data.all.length) curIndex = 0;
+                    } else {
+                        curIndex--;
+                        if (curIndex == -1) curIndex = this.data.all.length - 1;
+                    }
+                    imgData.xhr = null;
+                    imgData.src = this.data.all[curIndex];
+                    let openType = "actual";
+                    if (uniqueImgWin && uniqueImgWin == this) {
+                        uniqueImgWin = null;
+                        openType = "popup";
+                    }
+                    new LoadingAnimC(imgData, openType, false, true, initPos);
+                    return;
+                }
+                if (!gallery) {
+                    gallery = new GalleryC();
+                    gallery.data = [];
+                }
+                if (gallery.shown || gallery.minimized) {
+                    return;
+                }
+                var allData = await gallery.getAllValidImgs(false, true);
+                if (allData.length <= 1) return;
+                const validData = (data, src) => {
+                    if (!data || !data.img || !data.img.parentNode) return false;
+                    if (data.img.parentNode.classList.contains("pv-pic-window-container")) return false;
+                    if (data.src == src) return false;
+                    if (data.src && /^data:/.test(data.src) && data.src.length < 250) return false;
+                    return true;
+                };
+                if (this.data.img) {
+                    for (let i = 0; i < allData.length; i++) {
+                        let imgData = allData[i];
+                        if (imgData.img == this.data.img) {
+                            if (fw) {
+                                if (i != allData.length - 1) {
+                                    i++;
+                                    imgData = allData[i];
+                                    while (!validData(imgData, this.data.src)) {
+                                        i++;
+                                        if (i == allData.length) return;
+                                        imgData = allData[i];
+                                    }
+                                    if (imgData && imgData.img) {
+                                        let initPos = prefs.imgWindow.switchStoreLoc ? {left: this.imgWindow.style.left, top: this.imgWindow.style.top} : false;
+                                        this.remove();
+                                        new LoadingAnimC(imgData, (this.actual ? "actual" : "current"), false, true, initPos);
+                                    }
+                                }
+                            } else {
+                                if (i != 0) {
+                                    i--;
+                                    imgData = allData[i];
+                                    while (!validData(imgData, this.data.src)) {
+                                        i--;
+                                        if (i == -1) return;
+                                        imgData = allData[i];
+                                    }
+                                    if (imgData) {
+                                        let initPos = prefs.imgWindow.switchStoreLoc ? {left: this.imgWindow.style.left, top: this.imgWindow.style.top} : false;
+                                        this.remove();
+                                        new LoadingAnimC(imgData, (this.actual ? "actual" : "current"), false, true, initPos);
+                                    }
+                                }
+                            }
+                            return;
+                        }
+                    }
+                    if (this.data.img.src) {
+                        for (let i = 0; i < allData.length; i++) {
+                            let imgData = allData[i];
+                            if (imgData.img && imgData.img.src == this.data.img.src) {
+                                if (fw) {
+                                    if (i != allData.length - 1) {
+                                        i++;
+                                        imgData = allData[i];
+                                        while (!validData(imgData, this.data.src)) {
+                                            i++;
+                                            if (i == allData.length) return;
+                                            imgData = allData[i];
+                                        }
+                                        if (imgData && imgData.img) {
+                                            let initPos = prefs.imgWindow.switchStoreLoc ? {left: this.imgWindow.style.left, top: this.imgWindow.style.top} : false;
+                                            this.remove();
+                                            new LoadingAnimC(imgData, (this.actual ? "actual" : "current"), false, true, initPos);
+                                        }
+                                    }
+                                } else {
+                                    if (i != 0) {
+                                        i--;
+                                        imgData = allData[i];
+                                        while (!validData(imgData, this.data.src)) {
+                                            i--;
+                                            if (i == -1) return;
+                                            imgData = allData[i];
+                                        }
+                                        if (imgData) {
+                                            let initPos = prefs.imgWindow.switchStoreLoc ? {left: this.imgWindow.style.left, top: this.imgWindow.style.top} : false;
+                                            this.remove();
+                                            new LoadingAnimC(imgData, (this.actual ? "actual" : "current"), false, true, initPos);
+                                        }
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+            },
             changeData:function(result){
                 if(this.src != result.src){
-                    //this.imgWindow.classList.add("pv-pic-window-transition-all");
                     this.loaded = false;
                     this.data = result;
                     this.src = result.src;
@@ -18022,30 +21803,99 @@ ImgOps | https://imgops.com/#b#`;
                 }
             },
             addStyle:function(){
-                if(ImgWindowC.style)return;
-                var style=document.createElement('style');
-                ImgWindowC.style=style;
-                style.textContent='\
+                if (ImgWindowC.style) {
+                    if (!ImgWindowC.style.parentNode) {
+                        ImgWindowC.style = _GM_addStyle(ImgWindowC.style.innerText);
+                    }
+                    return;
+                }
+                ImgWindowC.style=_GM_addStyle('\
                     .pv-pic-window-container {\
-                    position: absolute;\
-                    background-color: rgba(40,40,40,0.8);\
-                    padding: 8px;\
-                    border: 5px solid rgb(255 255 255 / 60%);\
+                    ' + (prefs.imgWindow.fixed ? 'position: fixed;' : 'position: absolute;') + '\
+                    background-image: initial;\
+                    padding: 0;\
+                    border: 3px solid rgb(255 255 255 / 50%);\
                     border-radius: 1px;\
                     line-height: 0;\
                     text-align: left;\
                     box-sizing: content-box;\
-                    -webkit-transition: opacity 0.1s ease-out;\
+                    -webkit-transition: opacity 0.2s ease-out;\
                     transition: opacity 0.1s ease-out;\
                     overscroll-behavior: none;\
+                    box-shadow: 0 0 6px 2px rgba(0,0,0,0.35);\
+                    box-sizing: content-box;\
+                    display: initial;\
+                    background: #00000080;\
+                    }\
+                    .pv-pic-window-container span {\
+                    background-image: initial;\
+                    float: initial;\
                     }\
                     .pv-pic-window-transition-all{\
-                    -webkit-transition: all 0.3s ease-out;\
-                    transition: all 0.3s ease-out;\
+                    -webkit-transition: top 0.2s ease, left 0.2s ease;\
+                    transition: top 0.2s ease, left 0.2s ease;\
                     }\
-                    .pv-pic-window-container_focus {\
-                    box-shadow: 0 0 10px 5px rgba(0,0,0,0.6);\
-                    box-sizing: content-box;\
+                    .pv-pic-window-imgbox {\
+                    position: relative;\
+                    display: block;\
+                    overflow: hidden;\
+                    background-color: rgba(40, 40, 40, 0.65);\
+                    }\
+                    .pv-pic-window-container .compareBox {\
+                    position: absolute;\
+                    top: 0;\
+                    left: 0;\
+                    width: 100%;\
+                    height: 100%;\
+                    pointer-events: none;\
+                    }\
+                    .pv-pic-window-container .compareBox>div {\
+                    width: 100%;\
+                    height: 100%;\
+                    position: absolute;\
+                    }\
+                    .pv-pic-window-container .compareBox>div>.compareImgCon {\
+                    width: 100%;\
+                    max-width: 100%;\
+                    height: 100%;\
+                    overflow: hidden;\
+                    }\
+                    .pv-pic-window-container .compareBox>div>.compareImgCon>img {\
+                    width: auto;\
+                    height: 100%;\
+                    max-width: unset;\
+                    }\
+                    .pv-pic-window-container .compareBox>div>.compareSlider {\
+                    position: absolute;\
+                    top: 0;\
+                    bottom: 0;\
+                    width: 2px;\
+                    background-color: rgba(255,255,255,.5);\
+                    border-top: 0;\
+                    border-bottom: 0;\
+                    box-shadow: 0 0 2px rgba(0,0,0,.5);\
+                    overflow: visible;\
+                    z-index: 9;\
+                    }\
+                    .pv-pic-window-container .compareBox>div>.compareSlider>button {\
+                    position: absolute;\
+                    top: calc(50% - 40px);\
+                    left: -4px;\
+                    width: 10px;\
+                    background-color: #ddd;\
+                    border: 4px solid #fff;\
+                    height: 80px;\
+                    text-align: center;\
+                    padding: 0;\
+                    outline: 0;\
+                    cursor: ew-resize;\
+                    box-shadow: 0 0 2px rgba(0,0,0,.5);\
+                    pointer-events: all;\
+                    box-sizing: border-box;\
+                    background-image: none;\
+                    }\
+                    .pv-pic-window-container .compareBox>div>.compareSlider>button:hover {\
+                    background-color: #777;\
                     }\
                     .pv-pic-window-close,\
                     .pv-pic-window-max,\
@@ -18054,12 +21904,13 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-pic-window-tb-tool-extend-menu{\
                     -webkit-transition: opacity 0.2s ease-in-out;\
                     transition: opacity 0.2s ease-in-out;\
+                    box-sizing: content-box;\
                     }\
                     .pv-pic-window-toolbar {\
                     position: absolute;\
                     background-color: #535353;\
                     padding: 0;\
-                    opacity: 0.7;\
+                    opacity: 0.5;\
                     display: none;\
                     cursor: default;\
                     -o-user-select: none;\
@@ -18067,39 +21918,37 @@ ImgOps | https://imgops.com/#b#`;
                     -moz-user-select: -moz-none;\
                     user-select: none;\
                     }\
-                    .pv-pic-window-toolbar:hover {\
-                    opacity: 1;\
-                    }\
-                    .pv-pic-window-container_focus>.pv-pic-window-toolbar {\
+                    .pv-pic-window-container_focus:not(.preview)>.pv-pic-window-toolbar {\
                     display: block;\
                     }\
-                    .pv-pic-window-close {\
+                    .pv-pic-window-toolbar:hover,\
+                    .pv-pic-window-container>.pv-pic-window-toolbar.insert:hover{\
+                    opacity: 1;\
+                    }\
+                    span.pv-pic-window-close {\
                     cursor: pointer;\
                     position: absolute;\
                     right: 0px;\
-                    top: -24px;\
+                    top: -22px;\
                     background: url("'+prefs.icons.close+'") no-repeat center bottom;\
                     height: 17px;\
                     width: 46px;\
-                    opacity: 0.7;\
+                    opacity: 0.5;\
                     border:none;\
                     padding:0;\
-                    padding-top:2px;\
+                    padding-top:2px!important;\
                     background-color:#1771FF;\
                     display: none;\
+                    z-index: 2;\
                     }\
-                    .pv-pic-window-close:hover {\
-                    background-color:red;\
-                    opacity: 1;\
-                    }\
-                    .pv-pic-window-container_focus>.pv-pic-window-close {\
+                    .pv-pic-window-container_focus:not(.preview)>.pv-pic-window-close {\
                     display: block;\
                     }\
-                    .pv-pic-window-search {\
+                    span.pv-pic-window-search {\
                     cursor: pointer;\
                     position: absolute;\
                     right: 50px;\
-                    top: -24px;\
+                    top: -22px;\
                     background: url("'+prefs.icons.searchBtn+'") no-repeat center bottom;\
                     height: 17px;\
                     width: 46px;\
@@ -18110,66 +21959,236 @@ ImgOps | https://imgops.com/#b#`;
                     background-color:#1771FF;\
                     display: none;\
                     }\
-                    .pv-pic-window-max {\
+                    span.pv-pic-window-max {\
                     cursor: pointer;\
                     position: absolute;\
                     right: 46px;\
-                    top: -24px;\
+                    top: -22px;\
                     background: url("'+prefs.icons.maxBtn+'") no-repeat center bottom;\
                     height: 17px;\
                     width: 46px;\
-                    opacity: 0.7;\
+                    opacity: 0.5;\
                     border:none;\
                     border-right: 1px solid #868686;\
                     padding:0;\
-                    padding-top:2px;\
+                    padding-top:2px!important;\
                     background-color:#1771FF;\
                     display: none;\
+                    z-index: 2;\
                     }\
-                    .pv-pic-window-max:hover {\
+                    .pv-pic-window-container>.pv-pic-window-max:hover,\
+                    .pv-pic-window-container>.pv-pic-window-close:hover,\
+                    .pv-pic-window-container>.pv-pic-window-max.insert:hover,\
+                    .pv-pic-window-container>.pv-pic-window-close.insert:hover {\
                     background-color:red;\
-                    opacity: 1;\
+                    opacity: 1!important;\
                     }\
-                    .pv-pic-window-container_focus>.pv-pic-window-max {\
+                    .pv-pic-window-container_focus:not(.preview)>.pv-pic-window-max {\
                     display: block;\
                     }\
                     .pv-pic-window-search:hover {\
                     background-color:red;\
                     opacity: 1;\
                     }\
-                    .pv-pic-window-container_focus>.pv-pic-window-search {\
+                    .pv-pic-window-container_focus:not(.preview)>.pv-pic-window-search {\
                     display: block;\
                     }\
                     .pv-pic-window-description {\
-                    margin-top: 20px;\
-                    min-height: 20px;\
+                    display: none;\
+                    background: yellow;\
+                    margin: 0 -5px 0 15px!important;\
+                    padding: 3px!important;\
+                    color: black;\
+                    text-shadow: 0 0 1px #00000099;\
                     }\
-                    .pv-pic-window-container:hover>.pv-pic-search-state{\
+                    .pv-pic-window-description::before {\
+                    display: inline-block;\
+                    content:"";\
+                    position: absolute;\
+                    border: 10px solid transparent;\
+                    margin-left: -22px;\
+                    top: -1px;\
+                    border-right-color: yellow;\
+                    }\
+                    span.pv-pic-window-pre,\
+                    span.pv-pic-window-next{\
+                    -webkit-transition: opacity 0.3s ease;\
+                    transition: opacity 0.3s ease;\
+                    position: absolute;\
+                    height: 100px;\
+                    top: calc(50% - 50px);\
+                    width: 36px;\
+                    background: #ffffff60 no-repeat center;\
+                    opacity: 0;\
+                    cursor: pointer;\
+                    pointer-events: none;\
+                    }\
+                    span.pv-pic-window-pre {\
+                    left: 0;\
+                    background-image: url("'+prefs.icons.arrowLeft+'");\
+                    }\
+                    span.pv-pic-window-next {\
+                    right: 0;\
+                    background-image: url("'+prefs.icons.arrowRight+'");\
+                    }\
+                    .compare>.pv-pic-search-state{\
+                    display: none;\
+                    }\
+                    .pv-pic-window-container_focus>.pv-pic-search-state,.preview>.pv-pic-search-state {\
                     opacity:0.8;\
                     }\
-                    .pv-pic-window-container>span.pv-pic-search-state:hover{\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-window-imgbox{\
+                    cursor: none;\
+                    }\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-search-state,\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-window-toolbar,\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-window-max,\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-window-close,\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-window-pre,\
+                    .pv-pic-window-container_focus.hideToolbar>.pv-pic-window-next{\
+                    opacity:0!important;\
+                    }\
+                    .pv-pic-window-container_focus:not(.preview) .pv-pic-window-imgbox:hover~.pv-pic-window-pre,\
+                    .pv-pic-window-container_focus:not(.preview) .pv-pic-window-imgbox:hover~.pv-pic-window-next{\
+                    opacity:0.3;\
+                    pointer-events: all;\
+                    }\
+                    .pv-pic-window-container>.pv-pic-window-pre:hover,\
+                    .pv-pic-window-container>.pv-pic-window-next:hover{\
+                    opacity:1;\
+                    pointer-events: all;\
+                    }\
+                    .pv-pic-window-container_focus:hover>.pv-pic-search-state{\
+                    border-radius: 0 0 8px 0;\
+                    top: 0px;\
+                    pointer-events: all;\
+                    }\
+                    .pv-pic-window-container>.pv-pic-window-pre:hover~span.pv-pic-search-state,\
+                    .pv-pic-window-container>.pv-pic-window-next:hover~span.pv-pic-search-state{\
                     opacity:0;\
                     }\
-                    .pv-pic-search-state {\
-                    top: 9px;\
-                    left: 9px;\
+                    .pv-pic-window-container>span.pv-pic-search-state:hover{\
+                    overflow:visible;\
+                    background:none;\
+                    box-shadow:none;\
+                    opacity: 1;\
+                    height: 30px;\
+                    }\
+                    .pv-pic-window-container>span.pv-pic-search-state:hover>span{\
+                    opacity: 0;\
+                    }\
+                    .pv-pic-window-container>span.pv-pic-search-state:hover>svg{\
+                    display: block;\
+                    }\
+                    span.pv-pic-search-state {\
+                    top: -21px;\
+                    left: 0px;\
                     display: block;\
                     position: absolute;\
                     z-index: 1;\
                     color: #ffff00;\
-                    height: 20px;\
-                    line-height: 20px;\
-                    background: rgb(0 0 0 / 80%);\
-                    border-radius: 8px;\
-                    padding: 1px 5px;\
-                    white-space: nowrap;\
-                    overflow: hidden;\
-                    opacity:0.3;\
-                    font-size: small;\
+                    height: 18px;\
+                    line-height: 18px;\
+                    opacity:0;\
                     transition: all 0.3s ease;\
                     user-select: none;\
                     -webkit-box-sizing: content-box;\
                     box-sizing: content-box;\
+                    border-radius: 1px;\
+                    background: rgb(0 0 0 / 75%);\
+                    box-shadow: rgb(221, 221, 221) 0px 0px 1px inset;\
+                    max-width: 100%;\
+                    overflow: hidden;\
+                    font: 13px / 1.4em Roboto,arial,sans-serif,微软雅黑,"Noto Sans SC";\
+                    pointer-events: none;\
+                    }\
+                    .pv-pic-search-state>span {\
+                    pointer-events: none;\
+                    padding: 1px 5px!important;\
+                    white-space: nowrap;\
+                    overflow: hidden;\
+                    }\
+                    .pv-pic-search-state>span>b {\
+                    background: yellow;\
+                    color: black;\
+                    margin-right: -5px;\
+                    padding: 3px;\
+                    }\
+                    .pv-pic-search-state>span>strong {\
+                    background: inherit;\
+                    color: #ffffff;\
+                    }\
+                    span.pv-pic-search-state>.pv-icon {\
+                    width: 20px;\
+                    height: 20px;\
+                    vertical-align: middle;\
+                    fill: currentColor;\
+                    overflow: hidden;\
+                    position: absolute;\
+                    left: 1px;\
+                    top: 1px;\
+                    background: black;\
+                    border-radius: 15px;\
+                    padding: 5px;\
+                    color: white;\
+                    cursor: pointer;\
+                    display: none;\
+                    box-sizing: content-box;\
+                    transition: all 0.3s ease;\
+                    }\
+                    .pv-pic-search-state>.pv-icon:hover {\
+                    color: #ffff00;\
+                    }\
+                    .pv-pic-search-state>.pv-icon * {\
+                    pointer-events: none;\
+                    }\
+                    .pv-pic-window-scrollSign {\
+                    display: none;\
+                    width: 100px;\
+                    height: auto;\
+                    fill: black;\
+                    top: 10px;\
+                    right: 0px;\
+                    position: absolute;\
+                    opacity: 0;\
+                    -webkit-animation: scroll_sign_opacity 2s 3 ease-in-out;\
+                    animation: scroll_sign_opacity 2s 3 ease-in-out;\
+                    }\
+                    @-webkit-keyframes scroll_sign_opacity {\
+                      0% { opacity: 0 }\
+                      50% { opacity: 1 }\
+                      100% { opacity: 0 }\
+                    }\
+                    @keyframes scroll_sign_opacity {\
+                      0% { opacity: 0 }\
+                      50% { opacity: 1 }\
+                      100% { opacity: 0 }\
+                    }\
+                    .pv-pic-window-scroll {\
+                    max-height: calc(100vh - 2px);\
+                    max-width: 100vw;\
+                    }\
+                    .pv-pic-window-scroll>.pv-pic-window-imgbox {\
+                    max-height: calc(100vh - 2px);\
+                    max-width: 100vw;\
+                    overflow-y: scroll;\
+                    overflow-x: hidden;\
+                    overscroll-behavior: contain;\
+                    -ms-scroll-chaining: contain;\
+                    scrollbar-color: initial;\
+                    }\
+                    .pv-pic-window-scroll>.pv-pic-window-scrollSign {\
+                    display: block;\
+                    }\
+                    .pv-pic-window-scroll>.pv-pic-window-close,\
+                    .pv-pic-window-scroll>.pv-pic-window-max {\
+                    display: none;\
+                    }\
+                    .pv-pic-window-black>.pv-pic-window-imgbox>img {\
+                    background: black!important;\
+                    }\
+                    .pv-pic-window-white>.pv-pic-window-imgbox>img {\
+                    background: white!important;\
                     }\
                     .transition-transform{\
                     transition: transform 0.3s ease;\
@@ -18180,26 +22199,36 @@ ImgOps | https://imgops.com/#b#`;
                     .pv-pic-window-pic {\
                     position: relative;\
                     display:inline-block;\/*opera把图片设置display:block会出现渲染问题，会有残影，还会引发其他各种问题，吓尿*/\
-                    max-width:none;\
-                    min-width:none;\
-                    max-height:none;\
-                    min-height:none;\
+                    max-width:unset;\
+                    min-width:unset;\
+                    max-height:unset;\
+                    min-height:unset;\
+                    width:inherit!important;\
+                    height:inherit!important;\
                     padding:0;\
                     margin:0;\
                     border:none;\
                     vertical-align:middle;\
                     }\
-                    .pv-pic-window-container_focus>.pv-pic-window-pic {\
+                    .pv-pic-window-container.preview {\
+                    pointer-events: none;\
+                    }\
+                    .pv-pic-window-container_focus:not(.preview) .pv-pic-window-imgbox {\
                     box-shadow: 0 0 6px black;\
                     }\
-                    .pv-pic-window-tb-tool,\
-                    .pv-pic-window-tb-command{\
+                    span.pv-pic-window-container_focus:not(.preview) .pv-pic-window-pic {\
+                    background: linear-gradient( 45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.4) 75%, rgba(255, 255, 255, 0.4) 100% ), linear-gradient( 45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.4) 75%, rgba(255, 255, 255, 0.4) 100% );\
+                    background-size: 20px 20px;\
+                    background-position: 0 0, 10px 10px;\
+                    }\
+                    span.pv-pic-window-tb-tool,\
+                    span.pv-pic-window-tb-command{\
                     box-sizing:content-box;\
                     -moz-box-sizing:content-box;\
                     -webkit-box-sizing:content-box;\
                     height: 24px;\
                     width: 24px;\
-                    padding: 12px 8px 6px 6px;\
+                    padding: 12px 8px 6px 6px!important;\
                     margin:0;\
                     display: block;\
                     background: transparent no-repeat center;\
@@ -18221,26 +22250,29 @@ ImgOps | https://imgops.com/#b#`;
                     box-shadow: inset 0 21px 0 rgba(255,255,255,0.3) ,inset 0 -21px 0 rgba(0,0,0,0.3);\
                     border-left:2px solid #1771FF;\
                     }\
-                    .pv-pic-window-tb-hand {\
-                    background-image: url("'+prefs.icons.hand+'");\
+                    .pv-pic-window-toolbar span.pv-pic-window-tb-hand {\
+                    background-image: url("'+prefs.icons.hand+'")!important;\
                     }\
-                    .pv-pic-window-tb-rotate {\
-                    background-image: url("'+prefs.icons.rotate+'");\
+                    .pv-pic-window-toolbar span.pv-pic-window-tb-rotate {\
+                    background-image: url("'+prefs.icons.rotate+'")!important;\
                     }\
-                    .pv-pic-window-tb-zoom {\
-                    background-image: url("'+prefs.icons.zoom+'");\
+                    .pv-pic-window-toolbar span.pv-pic-window-tb-zoom {\
+                    background-image: url("'+prefs.icons.zoom+'")!important;\
                     }\
-                    .pv-pic-window-tb-flip-horizontal {\
-                    background-image: url("'+prefs.icons.flipHorizontal+'");\
+                    .pv-pic-window-toolbar span.pv-pic-window-tb-flip-horizontal {\
+                    background-image: url("'+prefs.icons.flipHorizontal+'")!important;\
                     }\
-                    .pv-pic-window-tb-flip-vertical {\
-                    background-image: url("'+prefs.icons.flipVertical+'");\
+                    .pv-pic-window-toolbar span.pv-pic-window-tb-flip-vertical {\
+                    background-image: url("'+prefs.icons.flipVertical+'")!important;\
+                    }\
+                    .pv-pic-window-toolbar span.pv-pic-window-tb-compare {\
+                    background-image: url("'+prefs.icons.compare+'")!important;\
                     }\
                     .pv-pic-window-tb-tool-badge-container {\
                     display: block;\
                     position: relative;\
                     }\
-                    .pv-pic-window-tb-tool-badge {\
+                    span.pv-pic-window-tb-tool-badge {\
                     position: absolute;\
                     top: -3px;\
                     right: 1px;\
@@ -18252,7 +22284,7 @@ ImgOps | https://imgops.com/#b#`;
                     opacity: 0.5;\
                     color: black;\
                     }\
-                    .pv-pic-window-tb-tool-extend-menu{\
+                    span.pv-pic-window-tb-tool-extend-menu{\
                     position:absolute;\
                     top:0;\
                     margin-left:-1px;\
@@ -18271,7 +22303,7 @@ ImgOps | https://imgops.com/#b#`;
                     display:block;\
                     line-height:1.5;\
                     text-align:center;\
-                    padding:10px;\
+                    padding:10px!important;\
                     cursor:pointer;\
                     border: none;\
                     border-right: 2px solid transparent;\
@@ -18318,7 +22350,7 @@ ImgOps | https://imgops.com/#b#`;
                     left:0;\
                     z-index: '+prefs.imgWindow.zIndex+';\
                     }\
-                    .pv-pic-window-rotate-indicator{\
+                    span.pv-pic-window-rotate-indicator{\
                     display:none;\
                     position:fixed;\
                     width:250px;\
@@ -18328,7 +22360,7 @@ ImgOps | https://imgops.com/#b#`;
                     margin-left:-135px;\
                     background:transparent url("'+ prefs.icons.rotateIndicatorBG +'") no-repeat center;\
                     }\
-                    .pv-pic-window-rotate-indicator-pointer{\
+                    span.pv-pic-window-rotate-indicator-pointer{\
                     display:block;\
                     margin-left:auto;\
                     margin-right:auto;\
@@ -18358,17 +22390,18 @@ ImgOps | https://imgops.com/#b#`;
                     padding:0;\
                     background-color:rgba(255, 0, 0, 0.150);\
                     }\
-                    .pv-pic-window-container::-webkit-scrollbar { width: 0 !important }\
-                    .pv-pic-window-container { -ms-overflow-style: none;overflow: -moz-scrollbars-none; }\
-                    ';
-                document.head.appendChild(style);
+                    .pv-pic-window-container::-webkit-scrollbar, .pv-pic-window-container>.pv-pic-window-imgbox::-webkit-scrollbar { width: 0 !important }\
+                    .pv-pic-window-container, .pv-pic-window-container>.pv-pic-window-imgbox { -ms-overflow-style: none;overflow: -moz-scrollbars-none; }\
+                    ');
             },
 
             firstOpen:function(){
                 ImgWindowC.selectedTool='hand';
+                this.removed = false;
+                this.imgWindow.classList.remove("pv-pic-window-scroll");
                 this.focus();
                 var imgWindow=this.imgWindow;
-                var scrolled=getScrolled();
+                var scrolled=prefs.imgWindow.fixed ? {x:0, y:0} : getScrolled();
                 imgWindow.style.left=-5 + scrolled.x + 'px';
                 imgWindow.style.top=-5 + scrolled.y + 'px';
 
@@ -18383,20 +22416,23 @@ ImgOps | https://imgops.com/#b#`;
                     h:parseFloat(imgWindowCS.height),
                     w:parseFloat(imgWindowCS.width),
                 };
-                this.isLongImg=rectSize.h > wSize.h && rectSize.h/rectSize.w > 3.5;
+                this.isLongImg=rectSize.h > wSize.h && rectSize.h/rectSize.w > 2.5;
                 if(prefs.imgWindow.suitLongImg && this.isLongImg){
+                    if(prefs.imgWindow.fitToScreen){
+                        this.fitToScreenWidth();
+                    }
                     this.center(rectSize.w <= wSize.w,false);
-                    this.imgWindow.style.overflow="scroll";
-                    this.imgWindow.style.height="100%";
-                    this.imgWindow.style.maxWidth="100%";
-                    this.closeButton.style.display="none";
-                    this.maxButton.style.display="none";
+                    this.imgWindow.classList.add("pv-pic-window-scroll");
                 }else if(prefs.imgWindow.fitToScreen){
                     this.fitToScreen();
                     this.center(true,true);
                 }else{
                     this.center(rectSize.w <= wSize.w , rectSize.h <= wSize.h);
-                };
+                }
+                if (this.initPos) {
+                    this.imgWindow.style.left = this.initPos.left;
+                    this.imgWindow.style.top = this.initPos.top;
+                }
 
                 this.keepScreenInside();
             },
@@ -18412,6 +22448,7 @@ ImgOps | https://imgops.com/#b#`;
                 function keepSI(obj,offsetDirection,defaultValue, out){
                     var objRect=obj.getBoundingClientRect();
                     var objStyle=obj.style;
+                    var insert=false;
 
                     while(offsetDirection.length){
                         var oD=offsetDirection[0];
@@ -18456,48 +22493,200 @@ ImgOps | https://imgops.com/#b#`;
                                 }
                                 break;
                         }
+                        insert=insert||newValue!==oDV;
                         objStyle[oD]=newValue + 'px';
-
                     }
+                    insert ? obj.classList.add("insert") : obj.classList.remove("insert");
                 }
 
-                keepSI(this.closeButton,['top','right'],[-24,0]);
-                keepSI(this.maxButton,['top','right'],[-24,46],[0,46]);
-                //keepSI(this.searchButton,['top','right'],[-24,50]);
-                keepSI(this.toolbar,['top','left'],[0,-45]);
+                keepSI(this.closeButton,['top','right'],[-22,0]);
+                keepSI(this.maxButton,['top','right'],[-22,46],[0,46]);
+                //keepSI(this.searchButton,['top','right'],[-22,50]);
+                keepSI(this.toolbar,['top','left'],[0,-42]);
 
                 // 保持注释在图片里面
-                // keepSI(this.descriptionSpan,['bottom', 'left'],[-40, 10]);
+                //keepSI(this.descriptionSpan,['bottom', 'left'],[-40, 10]);
             },
-            fitToScreen:function(){
-                var imgWindow=this.imgWindow;
-                if(!prefs.imgWindow.fitToScreen || imgWindow.style.overflow=="scroll")return;
-                var wSize=getWindowSize();
-                //空隙
-                wSize.h -= 26;
-                wSize.w -= 26;
+            initMaxSize: function() {
+                let wSize = getWindowSize();
+                let maxWidth = wSize.w - 50, maxHeight = wSize.h - 50, left, top;
+                if (prefs.floatBar.previewMaxSizeW && maxWidth > prefs.floatBar.previewMaxSizeW) {
+                    maxWidth = prefs.floatBar.previewMaxSizeW;
+                }
+                if (prefs.floatBar.previewMaxSizeW && maxHeight > prefs.floatBar.previewMaxSizeH) {
+                    maxHeight = prefs.floatBar.previewMaxSizeH;
+                }
+                if (this.zoomLevel === 1) {
+                    this.zoomLevel = 0;
+                    this.zoom(1);
+                }
 
-                var imgWindowCS=unsafeWindow.getComputedStyle(imgWindow);
-                var rectSize={
-                    h:parseFloat(imgWindowCS.height),
-                    w:parseFloat(imgWindowCS.width),
+                let imgWindowCS = unsafeWindow.getComputedStyle(this.imgWindow);
+                let rectSize = {
+                    h: parseFloat(imgWindowCS.height),
+                    w: parseFloat(imgWindowCS.width),
                 };
 
-                var size;
-                if(rectSize.w - wSize.w>0 || rectSize.h - wSize.h>0){//超出屏幕，那么缩小。
-                    if(rectSize.w/rectSize.h > wSize.w/wSize.h){
-                        size={
-                            w:wSize.w,
-                            h:wSize.w / (rectSize.w/rectSize.h),
+                let size, containsScroll = this.imgWindow.classList.contains("pv-pic-window-scroll");
+
+                if (prefs.imgWindow.fitToScreenSmall || rectSize.w > maxWidth || rectSize.h > maxHeight) {
+                    if (rectSize.w / rectSize.h > maxWidth / maxHeight) {
+                        size = {
+                            w: maxWidth,
+                            h: maxWidth / (rectSize.w / rectSize.h),
                         };
-                    }else{
-                        size={
-                            h:wSize.h,
-                            w:wSize.h * (rectSize.w/rectSize.h),
+                    } else if (!containsScroll) {
+                        size = {
+                            h: maxHeight,
+                            w: maxHeight * (rectSize.w / rectSize.h),
                         }
                     };
 
-                    this.zoom(this.getRotatedImgCliSize(size).w/this.imgNaturalSize.w);
+                    let cs = this.getRotatedImgCliSize(size);
+                    let ns = this.imgNaturalSize;
+                    if (cs && ns && cs.w && ns.w) {
+                        this.zoom(cs.w / ns.w);
+                    }
+                }
+            },
+            followPos: function(posX, posY, imme) {
+                if (this.removed) return;
+                if (!prefs.floatBar.globalkeys.previewFollowMouse) return;
+                let imgWindow = this.imgWindow;
+                if (!imgWindow) return;
+                this.followPosX = posX;
+                this.followPosY = posY;
+                if (!imme && this.following) return;
+                let wSize = getWindowSize();
+
+                let paddingW = Math.min(250, wSize.w>>2, Math.max(this.data.img && this.data.img.clientWidth, 50)>>1);
+                let paddingH = Math.min(250, wSize.h>>2, Math.max(this.data.img && this.data.img.clientHeight, 50)>>1);
+                let padding2 = 50, left, top;//内外侧间距
+                imgWindow.style.position = "fixed";
+                let scrolled = {x: 0, y: 0};
+
+                this.initMaxSize();
+
+                if (imgWindow.offsetWidth / imgWindow.offsetHeight > wSize.w / wSize.h) {
+                    //宽条，上下半屏
+                    if (posY > wSize.h / 2) {
+                        //上
+                        top = posY - imgWindow.offsetHeight - paddingH + scrolled.y;
+                        if (top < padding2>>1) top = padding2>>1;
+                    } else {
+                        //下
+                        top = posY + paddingH + scrolled.y;
+                        if (top > wSize.h - imgWindow.offsetHeight - 1) top = wSize.h - imgWindow.offsetHeight - 1;
+                    }
+                    left = (wSize.w - imgWindow.offsetWidth) / 2;
+                    let maxLeft = posX + paddingW;
+                    if (left > maxLeft) left = maxLeft;
+                    else {
+                        let minLeft = posX - imgWindow.offsetWidth - paddingW;
+                        if (left < minLeft) left = minLeft;
+                    }
+                    left = left + scrolled.x;
+                } else {
+                    //窄条，左右半屏
+                    if (posX > wSize.w / 2) {
+                        //左
+                        left = posX - imgWindow.offsetWidth - paddingW + scrolled.x;
+                        if (left < 1) left = 1;
+                    } else {
+                        //右
+                        left = posX + paddingW + scrolled.x;
+                        if (left > wSize.w - imgWindow.offsetWidth - 1) left = wSize.w - imgWindow.offsetWidth - 1;
+                    }
+                    top = (wSize.h - imgWindow.offsetHeight) / 2;
+                    let maxTop = posY + paddingH;
+                    if (top > maxTop) top = maxTop;
+                    else {
+                        let minTop = posY - imgWindow.offsetHeight - paddingH;
+                        if (top < minTop) top = minTop;
+                    }
+                    top = top + scrolled.y;
+                }
+
+                clearTimeout(this.followPosTimer);
+                if (imme || !this.loaded) {
+                    imgWindow.classList.remove("pv-pic-window-transition-all");
+                    this.following = false;
+                } else {
+                    if (Math.abs(left - parseInt(imgWindow.style.left)) + Math.abs(top - parseInt(imgWindow.style.top)) > 50) {
+                        this.following = true;
+                        imgWindow.classList.add("pv-pic-window-transition-all");
+                        this.followPosTimer = setTimeout(() => {
+                            this.following = false;
+                            this.followPos(this.followPosX, this.followPosY);
+                            imgWindow.classList.add("pv-pic-window-transition-all");
+                        }, 250);
+                    } else {
+                        imgWindow.classList.remove("pv-pic-window-transition-all");
+                    }
+                }
+                imgWindow.style.left = left + 'px';
+                imgWindow.style.top = top + 'px';
+            },
+            fitToScreen:function(){
+                let imgWindow = this.imgWindow;
+                if (!prefs.imgWindow.fitToScreen) return;
+                let wSize=getWindowSize();
+                //空隙
+                wSize.h -= 6;
+                wSize.w -= 6;
+
+                let imgWindowCS = unsafeWindow.getComputedStyle(imgWindow);
+                let rectSize = {
+                    h: parseFloat(imgWindowCS.height),
+                    w: parseFloat(imgWindowCS.width),
+                };
+
+                let size = rectSize, containsScroll = imgWindow.classList.contains("pv-pic-window-scroll");
+                if (prefs.imgWindow.fitToScreenSmall || rectSize.w - wSize.w > 0 || rectSize.h - wSize.h > 0) {//超出屏幕，那么缩小。
+                    if (rectSize.w / rectSize.h > wSize.w / wSize.h) {
+                        size = {
+                            w: wSize.w,
+                            h: wSize.w / (rectSize.w / rectSize.h),
+                        };
+                    } else if (!containsScroll) {
+                        size = {
+                            h: wSize.h,
+                            w: wSize.h * (rectSize.w / rectSize.h),
+                        }
+                    };
+
+                    let cs = this.getRotatedImgCliSize(size);
+                    let ns = this.imgNaturalSize;
+                    if (cs && ns && cs.w && ns.w) {
+                        this.zoom(cs.w / ns.w);
+                    }
+                };
+            },
+            fitToScreenWidth:function(){
+                let imgWindow = this.imgWindow;
+                if (!prefs.imgWindow.fitToScreen) return;
+                let wSize=getWindowSize();
+                wSize.h -= 6;
+                wSize.w -= 6;
+
+                let imgWindowCS = unsafeWindow.getComputedStyle(imgWindow);
+                let rectSize = {
+                    h: parseFloat(imgWindowCS.height),
+                    w: parseFloat(imgWindowCS.width),
+                };
+
+                let size = rectSize, containsScroll = imgWindow.classList.contains("pv-pic-window-scroll");
+                if (rectSize.w > wSize.w) {
+                    size = {
+                        w: wSize.w,
+                        h: wSize.w / (rectSize.w / rectSize.h),
+                    };
+
+                    let cs = this.getRotatedImgCliSize(size);
+                    let ns = this.imgNaturalSize;
+                    if (cs && ns && cs.w && ns.w) {
+                        this.zoom(cs.w / ns.w);
+                    }
                 };
             },
             center:function(horizontal,vertical){
@@ -18505,9 +22694,9 @@ ImgOps | https://imgops.com/#b#`;
                 var imgWindow=this.imgWindow;
                 if(!imgWindow)return;
                 var wSize=getWindowSize();
-                var scrolled=getScrolled();
-                if(horizontal)imgWindow.style.left= (wSize.w - imgWindow.offsetWidth)/2 + scrolled.x +'px';
-                if(vertical)imgWindow.style.top= (wSize.h - imgWindow.offsetHeight)/2 + scrolled.y +'px';
+                var scrolled=prefs.imgWindow.fixed ? {x:0, y:0} : getScrolled();
+                if(horizontal)imgWindow.style.left = (wSize.w - imgWindow.offsetWidth)/2 + scrolled.x +'px';
+                if(vertical)imgWindow.style.top = (wSize.h - imgWindow.offsetHeight)/2 + scrolled.y +'px';
             },
 
 
@@ -18532,6 +22721,8 @@ ImgOps | https://imgops.com/#b#`;
                     imgWStyle.top=oriOffset.top + (e.pageY || e.touches[0].pageY)-mouseCoor.y +'px';
                     self.keepScreenInside();
                     self.moving=true;
+                    e.preventDefault();
+                    e.stopPropagation();
                 };
                 var mouseupHandler=function(){
                     e.preventDefault();
@@ -18555,6 +22746,7 @@ ImgOps | https://imgops.com/#b#`;
 
                 var img=this.img;
                 var imgWindow=this.imgWindow;
+                imgWindow.classList.remove("pv-pic-window-scroll");
 
                 var iTransform=img.style[support.cssTransform].replace(/rotate\([^)]*\)/i,'');
 
@@ -18575,32 +22767,24 @@ ImgOps | https://imgops.com/#b#`;
                 };
 
                 var imgOffset={
-                    top:parseFloat(img.style.top),
-                    left:parseFloat(img.style.left),
+                    top:parseFloat(img.parentNode.style.top),
+                    left:parseFloat(img.parentNode.style.left),
                 };
 
                 var self=this;
                 var PI=Math.PI;
 
-                var rotate=function (radians){
-                    if(self.rotatedRadians==radians)return;
-                    if(self.working){
-                        img.style[support.cssTransform] = ' rotate('+ radians +'rad) ' + iTransform;
-                    }else if(Math.abs(self.rotatedRadians-radians)==1.5*PI){
-                        img.classList.remove("transition-transform");
-                        img.style[support.cssTransform] = ' rotate('+ (self.rotatedRadians<radians?self.rotatedRadians+2*PI:self.rotatedRadians-2*PI) +'rad) ' + iTransform;
+                var rotate = function (radians) {
+                    if (self.rotatedRadians == radians) return;
+                    if (self.working) {
+                        img.parentNode.style[support.cssTransform] = ' rotate(' + radians + 'rad) ' + iTransform;
+                    } else {
+                        img.parentNode.classList.remove("transition-transform");
+                        img.parentNode.style[support.cssTransform] = ' rotate('+ radians +'rad) ' + iTransform;
                         setTimeout(()=>{
-                            img.classList.add("transition-all");
-                            img.classList.add("transition-transform");
-                            img.style[support.cssTransform] = ' rotate('+ radians +'rad) ' + iTransform;
+                            img.parentNode.classList.add("transition-transform");
                         },0);
-                    }else{
-                        img.classList.add("transition-all");
-                        img.style[support.cssTransform] = ' rotate('+ radians +'rad) ' + iTransform;//旋转图片
                     }
-                    setTimeout(()=>{
-                        img.classList.remove("transition-all");
-                    },300);
                     self.rotateIPointer.style[support.cssTransform]='rotate('+ radians +'rad)';//旋转指示器
 
                     self.rotatedRadians=radians;
@@ -18652,10 +22836,10 @@ ImgOps | https://imgops.com/#b#`;
                     self.rotateIndicator.style.display='none';
                     document.removeEventListener('mousemove',moveHandler,true);
                     document.removeEventListener('mouseup',mouseupHandler,true);
-                    self.img.classList.add("transition-transform");
+                    self.img.parentNode.classList.add("transition-transform");
                 };
 
-                self.img.classList.remove("transition-transform");
+                self.img.parentNode.classList.remove("transition-transform");
                 document.addEventListener('mousemove',moveHandler,true);
                 document.addEventListener('mouseup',mouseupHandler,true);
             },
@@ -18709,11 +22893,11 @@ ImgOps | https://imgops.com/#b#`;
 
             },
             setImgOffset:function(oriOffset,bImgSize,aImgSize){
-                var imgStyle=this.img.style;
+                var imgStyle=this.img.parentNode.style;
 
                 //避免出现指数形式的数字和单位相加，导致变成无效值
                 var top=this.notExponential(oriOffset.top + (aImgSize.h-bImgSize.h)*1/2) + 'px';
-                var left=this.notExponential(oriOffset.left + (aImgSize.w-bImgSize.w)*1/2)  + 'px';
+                var left=this.notExponential(oriOffset.left + (aImgSize.w-bImgSize.w)*1/2) + 'px';
                 imgStyle.top= top;
                 imgStyle.left= left;
             },
@@ -18745,11 +22929,32 @@ ImgOps | https://imgops.com/#b#`;
                     if(typeof level=='undefined' || level<0 || level==self.zoomLevel)return;
 
                     var afterImgSize={
-                        h:self.imgNaturalSize.h * level,
-                        w:self.imgNaturalSize.w * level,
+                        h:self.imgNaturalSize.h * level || 10,
+                        w:self.imgNaturalSize.w * level || 10,
                     };
                     img.width=afterImgSize.w;
                     img.height=afterImgSize.h;
+                    self.imgbox.style.width=afterImgSize.w + 'px';
+                    self.imgbox.style.height=afterImgSize.h + 'px';
+                    if (afterImgSize.w < 60) {
+                        self.imgState.style.display = "none";
+                    } else {
+                        self.imgState.style.display = "";
+                    }
+                    if (afterImgSize.w < 220) {
+                        self.maxButton.style.opacity = "0";
+                        self.closeButton.style.opacity = "0";
+                    } else {
+                        self.maxButton.style.opacity = "";
+                        self.closeButton.style.opacity = "";
+                    }
+                    if (afterImgSize.w < 100 || afterImgSize.h < 100) {
+                        self.preButton.style.left = "-36px";
+                        self.nextButton.style.right = "-36px";
+                    } else {
+                        self.preButton.style.left = "0px";
+                        self.nextButton.style.right = "0px";
+                    }
 
                     var afterimgRectSize=self.getRotatedImgRectSize( self.rotatedRadians, afterImgSize );
                     imgWindow.style.width=afterimgRectSize.w +'px';
@@ -18833,19 +23038,25 @@ ImgOps | https://imgops.com/#b#`;
                 var level;
                 var self=this;
                 if(this.zoomOut){//缩小
-                    ImgWindowC.zoomRangeR._find(function(value){
+                    let found = ImgWindowC.zoomRangeR.find(function(value){
                         if(value < self.zoomLevel){
                             level=value;
                             return true;
                         }
-                    })
+                    });
+                    if (!found) {
+                        level = self.zoomLevel * 0.9;
+                    }
                 }else{
-                    ImgWindowC.zoomRange._find(function(value){
+                    let found = ImgWindowC.zoomRange.find(function(value){
                         if(value > self.zoomLevel){
                             level=value;
                             return true;
                         };
                     });
+                    if (!found) {
+                        level = self.zoomLevel * 1.1;
+                    }
                 }
                 return level;
             },
@@ -18921,7 +23132,7 @@ ImgOps | https://imgops.com/#b#`;
 
 
                 var viewRangeRect=viewRange.getBoundingClientRect();
-                var scrolled=getScrolled();
+                var scrolled=prefs.imgWindow.fixed ? {x:0, y:0} : getScrolled();
                 var viewRangeCenterCoor={
                     x:viewRangeRect.left + scrolled.x + 1/2 * rangeSize.w,
                     y:viewRangeRect.top + scrolled.y + 1/2 * rangeSize.h,
@@ -18968,7 +23179,7 @@ ImgOps | https://imgops.com/#b#`;
                     self.working=false;
                     viewRange.style.display='none';
                     self.zoom(cLevel);
-                    var scrolled=getScrolled();
+                    var scrolled=prefs.imgWindow.fixed ? {x:0, y:0} : getScrolled();
                     imgWindow.style.top= -13 -  rectSize.h * ((parseFloat(vRS.top) - moveRange.y[0])/size.h) + scrolled.y +'px';
                     imgWindow.style.left= -13 - rectSize.w * ((parseFloat(vRS.left) - moveRange.x[0])/size.w) + scrolled.x +'px';
 
@@ -18984,11 +23195,35 @@ ImgOps | https://imgops.com/#b#`;
                 document.addEventListener('mousemove',moveHandler,true);
                 document.addEventListener('mouseup',mouseupHandler,true);
             },
+            updateImgState:function(zoomValue){
+                if (!this.imgState || !this.img || !this.img.naturalWidth) return;
+                var sizeText = this.imgSizeText ? " (" + this.imgSizeText + ")" : "";
+                var zoomText = (typeof zoomValue === "number" && zoomValue !== 1) ? " (" + parseInt(zoomValue * 100) + "%)" : "";
+                var indexText = (this.curIndex >= 0 && this.data && this.data.all) ? " <b>[" + (this.curIndex + 1) + "/" + this.data.all.length + "]</b>" : "";
+                setSearchState("<strong>" + this.img.naturalWidth + " x " + this.img.naturalHeight + "</strong>" + sizeText + zoomText + indexText, this.imgState);
+                this.descriptionSpan && this.imgState.appendChild(this.descriptionSpan);
+            },
+            fetchImgSize:function(url, strategy){
+                if (!this.isImg) return;
+                var sizeUrl = url || (this.img ? this.img.src : "");
+                if (!sizeUrl) return;
+                var self = this;
+                imageSizeFetcher.getSize(sizeUrl, { strategy: strategy || 'auto' }).then(size => {
+                    if (size === null) return;
+                    if (!self.img || self.img.src !== sizeUrl) return;
+                    self.imgSizeBytes = size;
+                    self.imgSizeText = formatBytes(size);
+                    self.updateImgState(self.zoomLevel || 1);
+                });
+            },
             setToolBadge:function(tool,content){
                 var scale=0;
                 switch(tool){
                     case 'zoom':{
                         scale=2;
+                        if (this.img.naturalWidth) {
+                            this.updateImgState(content);
+                        }
                     }break;
                     case 'rotate':{
                         scale=1;
@@ -19018,12 +23253,13 @@ ImgOps | https://imgops.com/#b#`;
 
             blur:function(e){
                 if(!this.focused)return;
+                ImgWindowC.showing = false;
                 var imgWindow =this.imgWindow;
                 //点击imgWinodw的外部的时候失去焦点
                 if(e!==true && imgWindow.contains(e.target))return;
                 imgWindow.classList.remove('pv-pic-window-container_focus');
                 document.removeEventListener('mousedown',this._blur,true);
-                document.removeEventListener('keydown',this._focusedKeydown,true);
+                document.removeEventListener('keydown',this._focusedKeydown,false);
                 document.removeEventListener('keyup',this._focusedKeyup,true);
                 this.changeCursor('default');
                 ImgWindowC.selectedTool=this.selectedTool;
@@ -19033,10 +23269,12 @@ ImgOps | https://imgops.com/#b#`;
             },
             focus:function(){
                 if(this.focused)return;
+                this.toolMap.compare.style.display = ImgWindowC.all.length > 1 ? "" : "none";
+                ImgWindowC.showing = true;
                 this.imgWindow.classList.add('pv-pic-window-container_focus');
                 this.imgWindow.style.zIndex=prefs.imgWindow.zIndex+1;
                 this.zIndex=prefs.imgWindow.zIndex+1;
-                document.addEventListener('keydown',this._focusedKeydown,true);
+                document.addEventListener('keydown',this._focusedKeydown,false);
                 document.addEventListener('keyup',this._focusedKeyup,true);
                 document.addEventListener('mousedown',this._blur,true);
 
@@ -19051,9 +23289,10 @@ ImgOps | https://imgops.com/#b#`;
             },
             focusedKeyup:function(e){
                 var keyCode=e.keyCode;
-                var valid=[32,18,16,72,17,72,82,90,67];
+                var valid=[27,32,18,16,72,17,72,82,90,67,37,38,39,40];
                 if(valid.indexOf(keyCode)==-1)return;
 
+                if (window.getSelection().toString()) return;
                 e.preventDefault();
 
                 switch(keyCode){
@@ -19077,9 +23316,9 @@ ImgOps | https://imgops.com/#b#`;
                             };
                         };
                     }break;
-                    case 16:{//shift键，旋转的时候按住shift键，步进缩放。
+                    case 16://shift键，旋转的时候按住shift键，步进缩放。
                         this.shiftKeyUp=true;
-                    }break;
+                        break;
                     case 17:{//ctrl键
                         clearTimeout(this.ctrlkeyDownTimer);
                         if(!this.justCKeyUp){//如果刚才没有松开c，规避划词软件的ctrl+c松开
@@ -19097,17 +23336,30 @@ ImgOps | https://imgops.com/#b#`;
                         clearTimeout(this.justCKeyUpTimer);
                         this.justCKeyUpTimer=setTimeout(function(){
                             self.justCKeyUp=false;
+                            _GM_setClipboard(self.src);
                         },100)
                     }break;
-                    case 72:{//h键
+                    case 72://h键
                         this.hKeyUp=true;
-                    }break;
-                    case 82:{//r键
+                        break;
+                    case 82://r键
                         this.rKeyUp=true;
-                    }break;
-                    case 90:{//z键
+                        break;
+                    case 90://z键
                         this.zKeyUp=true;
-                    }break;
+                        break;
+                    case 37:
+                        this.switchImage(false);
+                        break;
+                    case 39:
+                        this.switchImage(true);
+                        break;
+                    case 27:
+                        if (prefs.imgWindow.close.escKey) {
+                            this.remove();
+                            e.stopPropagation();
+                        }
+                        break;
                     default:break;
                 };
 
@@ -19118,9 +23370,31 @@ ImgOps | https://imgops.com/#b#`;
                     };
                 };
             },
-            focusedKeydown:function(e){
+            focusedKeydown:async function(e){
                 var keyCode=e.keyCode;
-                var valid=[32,82,72,90,18,16,17,27,67];//有效的按键
+                if (!prefs.floatBar.keys.enable) return;
+                if (window.getSelection().toString()) return;
+                if (this.data && this.data.img && e.key.toLowerCase() == prefs.floatBar.keys.download) {
+                    downloadImg(this.img.src, (this.data.img.title || this.data.img.alt), prefs.saveName, null, this.data);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                if (e.key.toLowerCase() == prefs.floatBar.keys.gallery) {
+                    if (!gallery) {
+                        gallery = new GalleryC();
+                        gallery.data = [];
+                    }
+                    var allData = await gallery.getAllValidImgs();
+                    allData.target = this.data;
+                    gallery.data = allData;
+                    gallery.load(gallery.data);
+                    this.remove();
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                var valid=[32,82,72,90,18,16,17,27,67,38,40];//有效的按键
                 if(valid.indexOf(keyCode)==-1) return;
 
                 e.preventDefault();
@@ -19131,13 +23405,22 @@ ImgOps | https://imgops.com/#b#`;
                     };
                     return;
                 };
-
                 switch(keyCode){
                     case 82:{//r键,切换到旋转工具
                         if(this.rKeyUp){
                             this.rKeyUp=false;
                             this.beforeTool=this.selectedTool;
-                            this.selectTool('rotate');
+                            if (this.beforeTool != 'rotate') {
+                                this.selectTool('rotate');
+                            }
+                            var PI = Math.PI;
+                            var value = this.rotatedRadians + (e.shiftKey ? -90 : 90) * PI / 180;
+                            if (value >= 2 * PI) {
+                                value -= 2 * PI;
+                            } else if (value < 0) {
+                                value += 2 * PI;
+                            }
+                            this.rotate(value,true);
                         };
                     }break;
                     case 72:{//h键,切换到抓手工具
@@ -19152,6 +23435,17 @@ ImgOps | https://imgops.com/#b#`;
                             this.zKeyUp=false;
                             this.beforeTool=this.selectedTool;
                             this.selectTool('zoom');
+                            let level = e.shiftKey ? (this.zoomLevel - 0.5) : (this.zoomLevel + 0.5);
+                            if (typeof level != 'undefined') {
+                                this.zoom(level, { x: 0, y: 0});
+                            }
+                            if (uniqueImgWin && uniqueImgWin == this) {
+                                if (prefs.floatBar.globalkeys.previewFollowMouse) {
+                                    this.followPos(uniqueImgWinInitX, uniqueImgWinInitY, true);
+                                } else {
+                                    this.center(true, true);
+                                }
+                            }
                         };
                     }break;
                     case 32:{//空格键阻止,临时切换到抓手功能
@@ -19187,12 +23481,17 @@ ImgOps | https://imgops.com/#b#`;
                         clearTimeout(this.ctrlkeyDownTimer);
                     }break;
                     case 27:{//ese关闭窗口
-                        if(prefs.imgWindow.close.escKey){
-                            this.remove();
-                        };
+                    }break;
+                    case 38:{//上
+                        this.imgbox.scrollTop -= 200;
+                    }break;
+                    case 40:{//下
+                        this.imgbox.scrollTop += 200;
                     }break;
                     default:break;
-                };
+                }
+                e.stopPropagation();
+                return false;
             },
 
             toolbarEventHandler:function(e){
@@ -19216,25 +23515,27 @@ ImgOps | https://imgops.com/#b#`;
                 };
             },
             imgWindowEventHandler:function(e){
-                e.stopPropagation();
+                if (e.button == 0) {
+                    e.stopPropagation();
+                }
                 var selectedTool=this.selectedTool;
                 if(selectedTool == "hand" && prefs.imgWindow.suitLongImg && this.isLongImg){
-                    var inScroll=this.imgWindow.style.overflow=="scroll";
+                    var inScroll=this.imgWindow.classList.contains("pv-pic-window-scroll");
                     if(e.type == "wheel" && inScroll)
                         return;
                     if(e.type == "click" && !this.moving){
                         var wSize=getWindowSize();
                         var imgWindow=this.imgWindow;
-                        var scrolled=getScrolled();
+                        var scrolled=prefs.imgWindow.fixed ? {x:0, y:0} : getScrolled();
                         var origTop=parseFloat(imgWindow.style.top);
                         if(inScroll){
-                            imgWindow.style.top = parseFloat(imgWindow.style.top) - getScrolled(imgWindow).y +'px';
+                            imgWindow.style.top = parseFloat(imgWindow.style.top) - getScrolled(imgWindow.children[0]).y +'px';
+                            this.imgWindow.classList.remove("pv-pic-window-scroll");
+                        } else {
+                            this.rotate(0,true);
+                            this.imgWindow.classList.add("pv-pic-window-scroll");
+                            imgWindow.children[0].scrollTop = -parseInt(imgWindow.style.top);
                         }
-                        this.imgWindow.style.height=inScroll?"":"100%";
-                        this.imgWindow.style.maxWidth=inScroll?"":"100%";
-                        this.imgWindow.style.overflow=inScroll?"":"scroll";
-                        this.closeButton.style.display=inScroll?"":"none";
-                        this.maxButton.style.display=inScroll?"":"none";
                         //this.center(true , true);
                         if(!inScroll){
                             imgWindow.style.top= (wSize.h - imgWindow.offsetHeight)/2 + scrolled.y +'px';
@@ -19248,8 +23549,18 @@ ImgOps | https://imgops.com/#b#`;
                 }
                 switch(e.type){
                     case 'click':{//阻止opera的图片保存
+                        if (selectedTool === "hand" && !this.moving) {
+                            if (this.imgWindow.classList.contains("pv-pic-window-black")) {
+                                this.imgWindow.classList.remove("pv-pic-window-black");
+                                this.imgWindow.classList.add("pv-pic-window-white");
+                            } else if (this.imgWindow.classList.contains("pv-pic-window-white")) {
+                                this.imgWindow.classList.remove("pv-pic-window-white");
+                            } else {
+                                this.imgWindow.classList.add("pv-pic-window-black");
+                            }
+                        }
                         this.moving=false;
-                        if(e.ctrlKey && e.target.nodeName=='IMG'){
+                        if(e.ctrlKey && e.target.nodeName.toUpperCase()=='IMG'){
                             e.preventDefault();
                         }
                     }break;
@@ -19257,6 +23568,7 @@ ImgOps | https://imgops.com/#b#`;
                     case 'touchstart':{
                         if(!this.focused){//如果没有focus，先focus
                             this.focus();
+                            this.moving=true;
                             this.keepScreenInside();
                         };
 
@@ -19275,7 +23587,7 @@ ImgOps | https://imgops.com/#b#`;
                             return;
                         };
 
-                        if((e.button!=0 && e.type!="touchstart") || (target!=this.imgWindow && target!=this.img && target!=this.rotateOverlayer))return;
+                        if((e.button!=0 && e.type!="touchstart") || (target!=this.imgWindow && target!=this.img && target!=this.rotateOverlayer && target!=this.imgState))return;
                         e.preventDefault();
                         if(this.tempHand){
                             this.move(e);
@@ -19320,6 +23632,7 @@ ImgOps | https://imgops.com/#b#`;
                         });
 
                         var level=this.getNextZoomLevel();
+                        this.zoomed=true;
 
                         this.zoom(level,ratio);
                         this.zoomOut=oriZoomOut;
@@ -19351,7 +23664,7 @@ ImgOps | https://imgops.com/#b#`;
                 };
 
                 if((tool=='rotate' || tool=='zoom') && done){
-                    var scrolled=getScrolled();
+                    var scrolled=prefs.imgWindow.fixed ? {x:0, y:0} : getScrolled();
                     var imgWindow=this.imgWindow;
                     var imgWinodowRect=imgWindow.getBoundingClientRect();
                     var imgWindowStyle=imgWindow.style;
@@ -19371,7 +23684,7 @@ ImgOps | https://imgops.com/#b#`;
                     fh:[/scaleX\([^)]*\)/i,' scaleX(-1) '],
                 };
 
-                var iTransform=this.img.style[support.cssTransform];
+                var iTransform=this.img.parentNode.style[support.cssTransform];
 
                 var toolClassList=this.toolMap[command].classList;
 
@@ -19382,21 +23695,28 @@ ImgOps | https://imgops.com/#b#`;
                     iTransform += map[command][1];
                     toolClassList.add(this.selectedToolClass);
                 };
-                this.img.style[support.cssTransform]=iTransform;
+                this.img.parentNode.style[support.cssTransform]=iTransform;
 
             },
             selectTool:function(tool){
                 var command=['fv','fh'];
                 if(command.indexOf(tool)==-1){//工具选择
                     if(this.selectedTool==tool){
-                        if(tool=="rotate"){
-                            var PI=Math.PI;
-                            var value=this.rotatedRadians + 90 * PI/180;
-                            if(value>=2*PI){
-                                value-=2*PI;
-                            }
-                            this.rotate(value,true);
-                        }
+                        return;
+                    }
+                    let self=this;
+                    if(tool=="compare"){
+                        var topmost=0, topmostWin;
+                        ImgWindowC.all.forEach(function(iwin){
+                            if(iwin.zIndex >= topmost && iwin!=self){
+                                topmost=iwin.zIndex;
+                                topmostWin=iwin;
+                            };
+                        });
+                        if(topmostWin){
+                            this.toolMap.compare.style.display="none";
+                            this.compare([topmostWin.img.src]);
+                        };
                         return;
                     }
                     var selectedTool=this.selectedTool;
@@ -19459,13 +23779,17 @@ ImgOps | https://imgops.com/#b#`;
                 this.blur(true);
                 if(!opacity)this.imgWindow.style.opacity=0;
                 let self = this;
-                setTimeout(function(){
-                    self.img.src= prefs.icons.brokenImg_small;//如果在加载中取消，图片也取消读取。
-                    self.imgWindow.parentNode.removeChild(self.imgWindow);
+                setTimeout(() => {
+                    if (this.removed) {
+                        if (self.isImg) self.img.src= prefs.icons.brokenImg_small;//如果在加载中取消，图片也取消读取。
+                        self.imgWindow.parentNode.removeChild(self.imgWindow);
+                    }
                 },300);
 
-                var index=ImgWindowC.all.indexOf(this);
-                ImgWindowC.all.splice(index,1);
+                if (!this.preview) {
+                    var index=ImgWindowC.all.indexOf(this);
+                    ImgWindowC.all.splice(index,1);
+                }
                 var removeEvent=document.createEvent('CustomEvent');
                 removeEvent.initCustomEvent('pv-removeImgWindow',false,false);
                 this.imgWindow.dispatchEvent(removeEvent);
@@ -19476,30 +23800,731 @@ ImgOps | https://imgops.com/#b#`;
                         ImgWindowC.overlayer.style.display='none';
                     };
                 }else{
-                    var topmost=0;
+                    var topmost=0, topmostWin;
                     ImgWindowC.all.forEach(function(iwin){
-                        if(iwin.zIndex > topmost){
-                            topmost=iwin;
-                        };
+                        if(iwin.zIndex >= topmost){
+                            topmost=iwin.zIndex;
+                            topmostWin=iwin;
+                        }
                     });
-                    if(topmost){
-                        topmost.focus();
-                    };
-                };
+                    if(topmostWin){
+                        topmostWin.focus();
+                    }
+                }
 
             },
 
         };
 
-        // 载入动画
-        function LoadingAnimC(data,buttonType,waitImgLoad,openInTopWindow){
-            this.args=arrayFn.slice.call(arguments,0);
-            this.data=data;//data
-            this.buttonType=buttonType;//点击的按钮类型
-            this.openInTopWindow=openInTopWindow;//是否在顶层窗口打开，如果在frame里面的话
-            this.waitImgLoad=waitImgLoad;//是否等待完全读取后打开
-            this.init();
+        addWheelEvent(getBody(document), e => {
+            if (uniqueImgWin && !uniqueImgWin.removed) {
+                if (uniqueImgWin.isLongImg) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uniqueImgWin.img.parentNode.scrollTop += e.deltaY;
+                } else if (uniqueImgWin.curIndex >= 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uniqueImgWin.switchImage(e.deltaY > 0);
+                }
+            }
+        }, true);
+
+        function StitcherC() {
+            this.selecting = false;
+            this.previewing = false;
+            this.selected = new Set();
+            this.overlay = null;
+            this.preview = null;
+            this.layout = 'column';
+            this.dragging = false;
+            this.startX = 0;
+            this.startY = 0;
+        }
+
+        StitcherC.prototype = {
+            addStyle: function() {
+                if (StitcherC.style) {
+                    if (!StitcherC.style.parentNode) {
+                        StitcherC.style = _GM_addStyle(StitcherC.style.innerText);
+                    }
+                    return;
+                }
+                StitcherC.style = _GM_addStyle('\
+                    .pv-stitch-overlay {\
+                    position: fixed;\
+                    top: 0;\
+                    left: 0;\
+                    width: 100%;\
+                    height: 100%;\
+                    z-index:'+(prefs.imgWindow.zIndex + 5)+';\
+                    pointer-events: none;\
+                    }\
+                    .pv-stitch-overlay * {\
+                    box-sizing: border-box;\
+                    }\
+                    .pv-stitch-panel {\
+                    position: fixed;\
+                    top: 12px;\
+                    left: 12px;\
+                    display: flex;\
+                    gap: 8px;\
+                    padding: 6px;\
+                    background: rgba(0,0,0,0.65);\
+                    border: 1px solid rgba(255,255,255,0.2);\
+                    border-radius: 6px;\
+                    pointer-events: auto;\
+                    }\
+                    .pv-stitch-panel-inline {\
+                    position: absolute;\
+                    top: 8px;\
+                    right: 8px;\
+                    left: auto;\
+                    }\
+                    .pv-stitch-action {\
+                    width: 28px;\
+                    height: 28px;\
+                    display: flex;\
+                    align-items: center;\
+                    justify-content: center;\
+                    color: #fff;\
+                    background: rgba(255,255,255,0.12);\
+                    border-radius: 4px;\
+                    cursor: pointer;\
+                    }\
+                    .pv-stitch-action:hover {\
+                    background: rgba(255,255,255,0.25);\
+                    }\
+                    .pv-stitch-action.active {\
+                    background: rgba(255,255,255,0.4);\
+                    }\
+                    .pv-stitch-action>svg {\
+                    width: 18px;\
+                    height: 18px;\
+                    fill: none;\
+                    stroke: currentColor;\
+                    stroke-width: 3;\
+                    stroke-linecap: round;\
+                    stroke-linejoin: round;\
+                    }\
+                    .pv-stitch-box {\
+                    position: fixed;\
+                    border: 1px dashed rgba(255,255,255,0.9);\
+                    background: rgba(79,179,255,0.18);\
+                    pointer-events: none;\
+                    display: none;\
+                    }\
+                    .pv-stitch-selected {\
+                    outline: 3px solid rgba(79,179,255,0.95);\
+                    outline-offset: -3px;\
+                    box-shadow: 0 0 0 3px rgba(79,179,255,0.9), 0 0 12px rgba(79,179,255,0.85);\
+                    filter: brightness(0.78) saturate(1.15);\
+                    }\
+                    .pv-stitch-selected-parent {\
+                    outline: 3px solid rgba(79,179,255,0.95);\
+                    outline-offset: -3px;\
+                    box-shadow: 0 0 0 3px rgba(79,179,255,0.9), 0 0 12px rgba(79,179,255,0.85);\
+                    }\
+                    .pv-stitch-preview {\
+                    pointer-events: auto;\
+                    background: rgba(0,0,0,0.6);\
+                    }\
+                    .pv-stitch-stage {\
+                    position: fixed;\
+                    top: 50%;\
+                    left: 50%;\
+                    transform: translate(-50%, -50%);\
+                    max-width: 90vw;\
+                    max-height: 80vh;\
+                    overflow: auto;\
+                    padding: 12px;\
+                    background: rgba(0,0,0,0.75);\
+                    border: 1px solid rgba(255,255,255,0.2);\
+                    border-radius: 8px;\
+                    pointer-events: auto;\
+                    }\
+                    .pv-stitch-items {\
+                    display: flex;\
+                    gap: 10px;\
+                    }\
+                    .pv-stitch-items-horizontal {\
+                    flex-direction: row;\
+                    }\
+                    .pv-stitch-items-vertical {\
+                    flex-direction: column;\
+                    }\
+                    .pv-stitch-item {\
+                    padding: 6px;\
+                    background: rgba(0,0,0,0.55);\
+                    border: 1px solid rgba(255,255,255,0.2);\
+                    border-radius: 6px;\
+                    cursor: move;\
+                    }\
+                    .pv-stitch-item.dragging {\
+                    opacity: 0.4;\
+                    }\
+                    .pv-stitch-item img {\
+                    display: block;\
+                    max-width: 220px;\
+                    max-height: 220px;\
+                    }\
+                    .pv-stitch-selecting, .pv-stitch-selecting * {\
+                    user-select: none;\
+                    }\
+                ');
+            },
+            openSelect: function() {
+                if (this.selecting || this.previewing) return;
+                this.addStyle();
+                this.selecting = true;
+                if (floatBar) floatBar.hide();
+                document.documentElement.classList.add('pv-stitch-selecting');
+                const overlay = document.createElement('div');
+                overlay.className = 'pv-stitch-overlay pv-stitch-select';
+                setHTML(overlay,
+                    '<div class="pv-stitch-panel">'+
+                    '<div class="pv-stitch-action pv-stitch-action-done" title="'+i18n("stitchDone")+'">'+
+                    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12l5 5 11-11"></path></svg>'+
+                    '</div>'+
+                    '<div class="pv-stitch-action pv-stitch-action-cancel" title="'+i18n("stitchCancel")+'">'+
+                    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 6l12 12M18 6l-12 12"></path></svg>'+
+                    '</div>'+
+                    '</div>'+
+                    '<div class="pv-stitch-box"></div>'
+                );
+                document.body.appendChild(overlay);
+                this.overlay = overlay;
+                this.box = overlay.querySelector('.pv-stitch-box');
+                const panel = overlay.querySelector('.pv-stitch-panel');
+                this.placePanel(panel);
+                overlay.querySelector('.pv-stitch-action-done').addEventListener('click', () => {
+                    if (!this.selected.size) {
+                        this.closeSelect();
+                        return;
+                    }
+                    const selected = Array.from(this.selected);
+                    this.closeSelect(false);
+                    this.openPreview(selected);
+                });
+                overlay.querySelector('.pv-stitch-action-cancel').addEventListener('click', () => {
+                    this.closeSelect();
+                });
+
+                this.onSelectMouseDown = (e) => {
+                    if (!this.selecting) return;
+                    if (panel.contains(e.target)) return;
+                    if (e.button !== 0 && e.button !== 2) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.dragging = true;
+                    panel.style.display = 'none';
+                    this.dragMode = (e.button === 2 || e.altKey || e.shiftKey) ? 'remove' : 'add';
+                    this.startX = e.clientX;
+                    this.startY = e.clientY;
+                    this.updateBox(e.clientX, e.clientY);
+                    this.box.style.display = 'block';
+                };
+                this.onSelectMouseMove = (e) => {
+                    if (!this.dragging) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.updateBox(e.clientX, e.clientY);
+                };
+                this.onSelectMouseUp = (e) => {
+                    if (!this.dragging) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.dragging = false;
+                    const rect = this.getBoxRect(e.clientX, e.clientY);
+                    this.box.style.display = 'none';
+                    if (rect.width < 4 && rect.height < 4) {
+                        const img = this.findImageAt(e.clientX, e.clientY);
+                        if (img) this.toggleSelection(img, this.dragMode);
+                        panel.style.display = '';
+                        this.placePanelNear(panel, e.clientX, e.clientY);
+                        return;
+                    }
+                    this.applySelection(rect, this.dragMode);
+                    panel.style.display = '';
+                    this.placePanelNear(panel, e.clientX, e.clientY);
+                };
+                this.onSelectClick = (e) => {
+                    if (!this.selecting) return;
+                    if (panel.contains(e.target)) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                this.onSelectContext = (e) => {
+                    if (!this.selecting) return;
+                    if (panel.contains(e.target)) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                this.onKeyDown = (e) => {
+                    if (e.key !== 'Escape') return;
+                    if (this.selecting) this.closeSelect();
+                    if (this.previewing) this.closePreview();
+                };
+                document.addEventListener('mousedown', this.onSelectMouseDown, true);
+                document.addEventListener('mousemove', this.onSelectMouseMove, true);
+                document.addEventListener('mouseup', this.onSelectMouseUp, true);
+                document.addEventListener('click', this.onSelectClick, true);
+                document.addEventListener('contextmenu', this.onSelectContext, true);
+                document.addEventListener('keydown', this.onKeyDown, true);
+            },
+            closeSelect: function(clear = true) {
+                if (!this.selecting) return;
+                this.selecting = false;
+                document.documentElement.classList.remove('pv-stitch-selecting');
+                if (this.overlay && this.overlay.parentNode) {
+                    this.overlay.parentNode.removeChild(this.overlay);
+                }
+                this.overlay = null;
+                this.box = null;
+                if (clear) this.clearSelection();
+                document.removeEventListener('mousedown', this.onSelectMouseDown, true);
+                document.removeEventListener('mousemove', this.onSelectMouseMove, true);
+                document.removeEventListener('mouseup', this.onSelectMouseUp, true);
+                document.removeEventListener('click', this.onSelectClick, true);
+                document.removeEventListener('contextmenu', this.onSelectContext, true);
+                if (!this.previewing) document.removeEventListener('keydown', this.onKeyDown, true);
+            },
+            clearSelection: function() {
+                this.selected.forEach((img) => {
+                    img.classList.remove('pv-stitch-selected');
+                    this.toggleParentClass(img, false);
+                });
+                this.selected.clear();
+            },
+            updateBox: function(x, y) {
+                const rect = this.getBoxRect(x, y);
+                this.box.style.left = rect.left + 'px';
+                this.box.style.top = rect.top + 'px';
+                this.box.style.width = rect.width + 'px';
+                this.box.style.height = rect.height + 'px';
+            },
+            getBoxRect: function(x, y) {
+                const left = Math.min(this.startX, x);
+                const top = Math.min(this.startY, y);
+                const width = Math.abs(this.startX - x);
+                const height = Math.abs(this.startY - y);
+                return {left, top, width, height, right: left + width, bottom: top + height};
+            },
+            applySelection: function(rect, mode) {
+                const imgs = this.getSelectableImages();
+                imgs.forEach((img) => {
+                    const r = img.getBoundingClientRect();
+                    if (rect.right < r.left || rect.left > r.right || rect.bottom < r.top || rect.top > r.bottom) return;
+                    if (mode === 'remove') this.removeSelection(img);
+                    else this.addSelection(img);
+                });
+            },
+            addSelection: function(img) {
+                if (this.selected.has(img)) return;
+                this.selected.add(img);
+                img.classList.add('pv-stitch-selected');
+                this.toggleParentClass(img, true);
+            },
+            removeSelection: function(img) {
+                if (!this.selected.has(img)) return;
+                this.selected.delete(img);
+                img.classList.remove('pv-stitch-selected');
+                this.toggleParentClass(img, false);
+            },
+            toggleSelection: function(img, mode) {
+                if (mode === 'remove') {
+                    this.removeSelection(img);
+                    return;
+                }
+                if (this.selected.has(img)) this.removeSelection(img);
+                else this.addSelection(img);
+            },
+            toggleParentClass: function(img, isAdd) {
+                const parent = img && img.parentNode;
+                if (!parent || parent.nodeType !== 1) return;
+                const tag = parent.tagName;
+                if (tag === 'BODY' || tag === 'HTML') return;
+                parent.classList.toggle('pv-stitch-selected-parent', isAdd);
+            },
+            findImageAt: function(x, y) {
+                const els = document.elementsFromPoint(x, y);
+                for (let i = 0; i < els.length; i++) {
+                    const el = els[i];
+                    if (this.overlay && this.overlay.contains(el)) continue;
+                    if (el.tagName === 'IMG') return el;
+                }
+                return null;
+            },
+            getSelectableImages: function() {
+                const imgs = document.querySelectorAll('img');
+                const list = [];
+                for (let i = 0; i < imgs.length; i++) {
+                    const img = imgs[i];
+                    if (!img.src && !img.currentSrc) continue;
+                    const style = unsafeWindow.getComputedStyle(img);
+                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+                    const rect = img.getBoundingClientRect();
+                    if (rect.width < 4 || rect.height < 4) continue;
+                    list.push(img);
+                }
+                return list;
+            },
+            getImgSrc: function(img) {
+                return img.currentSrc || img.src || img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('data-lazy-src') || img.getAttribute('data-zoom-image') || img.getAttribute('data-large');
+            },
+            getOriginalImgSrc: function(img) {
+                if (!img) return "";
+                let imgPA, imgPE = [];
+                let imgPN = img.parentNode;
+                while (imgPN && imgPN.nodeType === 1 && imgPN.nodeName !== "BODY") {
+                    if (!imgPA && imgPN.nodeName === "A") imgPA = imgPN;
+                    imgPE.push(imgPN);
+                    imgPN = imgPN.parentNode;
+                }
+                try {
+                    if (matchedRule && matchedRule.rules && matchedRule.rules.length > 0 && matchedRule.getImage) {
+                        let src = matchedRule.getImage(img, imgPA, imgPE);
+                        if (Array.isArray(src)) src = src[0];
+                        if (src && src !== img.src) return src;
+                    }
+                } catch (e) {}
+                try {
+                    if (tprules && tprules[0]) {
+                        const src = tprules[0].call(img);
+                        if (src) return src;
+                    }
+                } catch (e) {}
+                if (imgPA && imgPA.href && imageReg.test(imgPA.href) && imgPA.href !== img.src) {
+                    return imgPA.href;
+                }
+                return "";
+            },
+            openPreview: function(selected) {
+                const sources = [];
+                selected.forEach((img) => {
+                    const current = this.getImgSrc(img);
+                    const original = this.getOriginalImgSrc(img);
+                    const displaySrc = current || original;
+                    if (displaySrc) {
+                        sources.push({
+                            current: displaySrc,
+                            original: original && original !== displaySrc ? original : ''
+                        });
+                    }
+                    img.classList.remove('pv-stitch-selected');
+                    this.toggleParentClass(img, false);
+                });
+                this.selected.clear();
+                if (!sources.length) return;
+                if (this.previewing) return;
+                this.previewing = true;
+                this.addStyle();
+                const overlay = document.createElement('div');
+                overlay.className = 'pv-stitch-overlay pv-stitch-preview';
+                const isVertical = this.layout === 'column';
+                setHTML(overlay,
+                    '<div class="pv-stitch-stage">'+
+                    '<div class="pv-stitch-panel pv-stitch-panel-inline">'+
+                    '<div class="pv-stitch-action pv-stitch-action-horizontal'+(isVertical ? '' : ' active')+'" title="'+i18n("stitchHorizontal")+'">'+
+                    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 8h6M4 16h6M14 8h6M14 16h6"></path></svg>'+
+                    '</div>'+
+                    '<div class="pv-stitch-action pv-stitch-action-vertical'+(isVertical ? ' active' : '')+'" title="'+i18n("stitchVertical")+'">'+
+                    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8 4v6M16 4v6M8 14v6M16 14v6"></path></svg>'+
+                    '</div>'+
+                    '</div>'+
+                    '<div class="pv-stitch-items '+(isVertical ? 'pv-stitch-items-vertical' : 'pv-stitch-items-horizontal')+'"></div>'+
+                    '</div>'+
+                    '<div class="pv-stitch-panel pv-stitch-panel-action">'+
+                    '<div class="pv-stitch-action pv-stitch-action-done" title="'+i18n("stitchDone")+'">'+
+                    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 12l5 5 11-11"></path></svg>'+
+                    '</div>'+
+                    '<div class="pv-stitch-action pv-stitch-action-cancel" title="'+i18n("stitchCancel")+'">'+
+                    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 6l12 12M18 6l-12 12"></path></svg>'+
+                    '</div>'+
+                    '</div>'
+                );
+                document.body.appendChild(overlay);
+                this.preview = overlay;
+                const itemsCon = overlay.querySelector('.pv-stitch-items');
+                const stage = overlay.querySelector('.pv-stitch-stage');
+                const actionPanel = overlay.querySelector('.pv-stitch-panel-action');
+                this.placeActionPanel(stage, actionPanel);
+                sources.forEach((source) => {
+                    const item = document.createElement('div');
+                    item.className = 'pv-stitch-item';
+                    item.setAttribute('draggable', 'true');
+                    item.dataset.src = source.current;
+                    if (source.original) item.dataset.original = source.original;
+                    const img = document.createElement('img');
+                    img.src = source.current;
+                    img.addEventListener('load', () => this.placeActionPanel(stage, actionPanel));
+                    item.appendChild(img);
+                    itemsCon.appendChild(item);
+                });
+                setTimeout(() => this.placeActionPanel(stage, actionPanel), 0);
+                let dragItem = null;
+                itemsCon.addEventListener('dragstart', (e) => {
+                    const item = e.target.closest('.pv-stitch-item');
+                    if (!item) return;
+                    dragItem = item;
+                    dragItem.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                itemsCon.addEventListener('dragend', () => {
+                    if (dragItem) dragItem.classList.remove('dragging');
+                    dragItem = null;
+                });
+                itemsCon.addEventListener('dragover', (e) => {
+                    if (!dragItem) return;
+                    const target = e.target.closest('.pv-stitch-item');
+                    if (!target || target === dragItem) return;
+                    e.preventDefault();
+                    const rect = target.getBoundingClientRect();
+                    const before = this.layout === 'row' ? e.clientX < rect.left + rect.width / 2 : e.clientY < rect.top + rect.height / 2;
+                    itemsCon.insertBefore(dragItem, before ? target : target.nextSibling);
+                });
+
+                const btnHorizontal = overlay.querySelector('.pv-stitch-action-horizontal');
+                const btnVertical = overlay.querySelector('.pv-stitch-action-vertical');
+                btnHorizontal.addEventListener('click', () => {
+                    this.setLayout('row', itemsCon, btnHorizontal, btnVertical);
+                    this.placeActionPanel(stage, actionPanel);
+                });
+                btnVertical.addEventListener('click', () => {
+                    this.setLayout('column', itemsCon, btnHorizontal, btnVertical);
+                    this.placeActionPanel(stage, actionPanel);
+                });
+                overlay.querySelector('.pv-stitch-action-done').addEventListener('click', async () => {
+                    const ordered = Array.from(itemsCon.querySelectorAll('.pv-stitch-item')).map(item => ({
+                        current: item.dataset.src,
+                        original: item.dataset.original || ''
+                    }));
+                    this.closePreview();
+                    await this.renderStitch(ordered, this.layout);
+                });
+                overlay.querySelector('.pv-stitch-action-cancel').addEventListener('click', () => {
+                    this.closePreview();
+                });
+                document.addEventListener('keydown', this.onKeyDown, true);
+            },
+            closePreview: function() {
+                if (!this.previewing) return;
+                this.previewing = false;
+                if (this.preview && this.preview.parentNode) {
+                    this.preview.parentNode.removeChild(this.preview);
+                }
+                this.preview = null;
+                if (!this.selecting) document.removeEventListener('keydown', this.onKeyDown, true);
+            },
+            placePanel: function(panel) {
+                if (!panel) return;
+                requestAnimationFrame(() => {
+                    const rect = panel.getBoundingClientRect();
+                    const pad = 8;
+                    const left = Math.min(Math.max(pad, (window.innerWidth - rect.width) / 2), window.innerWidth - rect.width - pad);
+                    let top = Math.round(window.innerHeight * 0.72);
+                    if (top + rect.height > window.innerHeight - pad) {
+                        top = window.innerHeight - rect.height - pad;
+                    }
+                    if (top < pad) top = pad;
+                    panel.style.left = left + 'px';
+                    panel.style.top = top + 'px';
+                });
+            },
+            placePanelNear: function(panel, x, y) {
+                if (!panel) return;
+                requestAnimationFrame(() => {
+                    const rect = panel.getBoundingClientRect();
+                    const pad = 8;
+                    const maxX = Math.max(pad, window.innerWidth - rect.width - pad);
+                    const maxY = Math.max(pad, window.innerHeight - rect.height - pad);
+                    let left = x + 12;
+                    let top = y + 12;
+                    if (left > maxX) left = x - rect.width - 12;
+                    if (top > maxY) top = y - rect.height - 12;
+                    left = Math.min(Math.max(pad, left), maxX);
+                    top = Math.min(Math.max(pad, top), maxY);
+                    panel.style.left = left + 'px';
+                    panel.style.top = top + 'px';
+                });
+            },
+            placeActionPanel: function(stage, panel) {
+                if (!stage || !panel) return;
+                requestAnimationFrame(() => {
+                    const stageRect = stage.getBoundingClientRect();
+                    const panelRect = panel.getBoundingClientRect();
+                    const pad = 8;
+                    const centerX = stageRect.left + stageRect.width / 2 - panelRect.width / 2;
+                    let top = stageRect.bottom + 12;
+                    let left = centerX;
+                    if (top + panelRect.height > window.innerHeight - pad) {
+                        top = stageRect.top - panelRect.height - 12;
+                    }
+                    if (top + panelRect.height > window.innerHeight - pad || top < pad) {
+                        top = window.innerHeight - panelRect.height - pad;
+                    }
+                    left = Math.min(Math.max(pad, left), window.innerWidth - panelRect.width - pad);
+                    top = Math.min(Math.max(pad, top), window.innerHeight - panelRect.height - pad);
+                    panel.style.left = left + 'px';
+                    panel.style.top = top + 'px';
+                });
+            },
+            setLayout: function(layout, itemsCon, btnHorizontal, btnVertical) {
+                this.layout = layout === 'column' ? 'column' : 'row';
+                itemsCon.classList.toggle('pv-stitch-items-horizontal', this.layout === 'row');
+                itemsCon.classList.toggle('pv-stitch-items-vertical', this.layout === 'column');
+                btnHorizontal.classList.toggle('active', this.layout === 'row');
+                btnVertical.classList.toggle('active', this.layout === 'column');
+            },
+            loadImageForStitch: function(src) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    let revoke = null;
+                    const onLoad = () => resolve({img, revoke});
+                    const onError = () => reject(new Error('load failed'));
+                    img.onload = onLoad;
+                    img.onerror = onError;
+                    if (/^data:|^blob:/i.test(src)) {
+                        img.src = src;
+                        return;
+                    }
+                    _GM_xmlhttpRequest({
+                        method: 'GET',
+                        url: src,
+                        responseType: 'blob',
+                        onload: (response) => {
+                            if (response.response instanceof Blob) {
+                                const blobUrl = URL.createObjectURL(response.response);
+                                revoke = () => URL.revokeObjectURL(blobUrl);
+                                img.src = blobUrl;
+                                return;
+                            }
+                            img.src = src;
+                        },
+                        onerror: onError
+                    });
+                });
+            },
+            createStitchBlobUrl: async function(srcs, layout) {
+                const loaded = await Promise.all(srcs.map(src => this.loadImageForStitch(src)));
+                let totalW = 0;
+                let totalH = 0;
+                let maxW = 0;
+                let maxH = 0;
+                loaded.forEach(({img}) => {
+                    const w = img.naturalWidth || img.width;
+                    const h = img.naturalHeight || img.height;
+                    if (w > maxW) maxW = w;
+                    if (h > maxH) maxH = h;
+                });
+                if (layout === 'column') {
+                    loaded.forEach(({img}) => {
+                        const w = img.naturalWidth || img.width;
+                        const h = img.naturalHeight || img.height;
+                        const ratio = w ? (maxW / w) : 1;
+                        const drawW = maxW || w;
+                        const drawH = h * ratio;
+                        totalW = Math.max(totalW, drawW);
+                        totalH += drawH;
+                    });
+                } else {
+                    loaded.forEach(({img}) => {
+                        const w = img.naturalWidth || img.width;
+                        const h = img.naturalHeight || img.height;
+                        const ratio = h ? (maxH / h) : 1;
+                        const drawH = maxH || h;
+                        const drawW = w * ratio;
+                        totalW += drawW;
+                        totalH = Math.max(totalH, drawH);
+                    });
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, totalW);
+                canvas.height = Math.max(1, totalH);
+                const ctx = canvas.getContext('2d');
+                let offset = 0;
+                loaded.forEach(({img}) => {
+                    const w = img.naturalWidth || img.width;
+                    const h = img.naturalHeight || img.height;
+                    if (layout === 'column') {
+                        const ratio = w ? (maxW / w) : 1;
+                        const drawW = maxW || w;
+                        const drawH = h * ratio;
+                        ctx.drawImage(img, 0, offset, drawW, drawH);
+                        offset += drawH;
+                    } else {
+                        const ratio = h ? (maxH / h) : 1;
+                        const drawH = maxH || h;
+                        const drawW = w * ratio;
+                        ctx.drawImage(img, offset, 0, drawW, drawH);
+                        offset += drawW;
+                    }
+                });
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                loaded.forEach(({revoke}) => revoke && revoke());
+                if (!blob) return '';
+                return unsafeWindow.URL.createObjectURL(blob);
+            },
+            renderStitch: async function(items, layout) {
+                if (!items || !items.length) return;
+                try {
+                    const currentSrcs = items.map(item => item.current || item.src || item);
+                    if (currentSrcs.some(src => !src)) return;
+                    const blobUrl = await this.createStitchBlobUrl(currentSrcs, layout);
+                    if (!blobUrl) return;
+                    const outImg = new Image();
+                    outImg.src = blobUrl;
+                    outImg.title = document.title || '';
+                    outImg.alt = outImg.title;
+                    const data = {img: outImg, imgSrc: blobUrl, src: blobUrl, srcs: [blobUrl]};
+                    const imgWin = new ImgWindowC(outImg, data, true);
+                    const finalSrcs = items.map((item, index) => item.original || currentSrcs[index]);
+                    const needsReplace = finalSrcs.some((src, index) => src && src !== currentSrcs[index]);
+                    if (!needsReplace) return;
+                    this.createStitchBlobUrl(finalSrcs, layout).then((finalBlobUrl) => {
+                        if (!finalBlobUrl) return;
+                        if (!imgWin || imgWin.removed) {
+                            unsafeWindow.URL.revokeObjectURL(finalBlobUrl);
+                            return;
+                        }
+                        imgWin.changeData({img: imgWin.img, imgSrc: finalBlobUrl, src: finalBlobUrl, srcs: [finalBlobUrl]});
+                    }).catch((e) => {
+                        console.warn('[Picviewer CE+] stitch replace failed', e);
+                    });
+                } catch (e) {
+                    console.warn('[Picviewer CE+] stitch failed', e);
+                }
+            }
         };
+
+        var stitcher = new StitcherC();
+
+        var lastPopupLoading;
+        // 载入动画
+        function LoadingAnimC(data, buttonType, waitImgLoad, openInTopWindow, initPos) {
+            if (LoadingAnimC.all.find(function(item, index, array) {
+                if (data.src == item.data.src || data.img == item.data.img) {
+                    return true;
+                }
+            })) return false;
+            if (buttonType === "popup") {
+                if (lastPopupLoading) {
+                    lastPopupLoading.cancel();
+                }
+                lastPopupLoading = this;
+            }
+            this.args = arrayFn.slice.call(arguments, 0);
+            if (data.src != data.imgSrc && !data.srcs) {
+                data.srcs = [data.imgSrc];
+            }
+            this.data = data;//data
+            this.buttonType = buttonType;//点击的按钮类型
+            this.openInTopWindow = openInTopWindow;//是否在顶层窗口打开，如果在frame里面的话
+            this.waitImgLoad = waitImgLoad;//是否等待完全读取后打开
+            this.initPos = initPos || false;
+            this.init();
+        }
 
         LoadingAnimC.all=[];
 
@@ -19528,14 +24553,13 @@ ImgOps | https://imgops.com/#b#`;
                 if (this.buttonType == 'popup'){
                     container.style.pointerEvents="none";
                 }
-                document.body.appendChild(container);
+                getBody(document).appendChild(container);
 
                 var self = this;
                 container.addEventListener('click',function(e){
                     var tcl=e.target.classList;
                     if(tcl.contains('pv-loading-cancle')){
-                        self.imgReady.abort();
-                        self.remove();
+                        self.cancel();
                     }else if(tcl.contains('pv-loading-retry')){
                         self.remove();
                         new LoadingAnimC(self.args[0],self.args[1],self.args[2],self.args[3]);
@@ -19544,7 +24568,7 @@ ImgOps | https://imgops.com/#b#`;
 
                 this.setPosition();
 
-                if (this.buttonType == 'current') {
+                if (!this.data.noActual && (this.buttonType == 'current' || this.buttonType == 'gallery')) {
                     this.loadImg(this.data.imgSrc);
                 } else {
                     if (!this.data.xhr) {
@@ -19576,7 +24600,15 @@ ImgOps | https://imgops.com/#b#`;
                             xhr: this.data.xhr,
                             cb: function(imgSrc, imgSrcs, caption) {
                                 if (imgSrc) {
+                                    self.data.src = imgSrc;
+                                    if (imgSrcs && imgSrcs.length) {
+                                        imgSrcs = Array.from(new Set(imgSrcs));
+                                    }
+                                    self.data.all = imgSrcs;
+                                    if (caption) self.data.description = caption;
                                     self.loadImg(imgSrc, imgSrcs);
+                                } else if (self.data.imgSrc) {
+                                    self.loadImg(self.data.imgSrc, imgSrcs);
                                 } else {
                                     self.error();
                                 }
@@ -19589,11 +24621,13 @@ ImgOps | https://imgops.com/#b#`;
                 }
             },
             addStyle:function(){
-                if(LoadingAnimC.styleAdded)return;
-                LoadingAnimC.styleAdded=true;
-                var style=document.createElement('style');
-                style.type='text/css';
-                style.textContent='\
+                if (LoadingAnimC.style) {
+                    if (!LoadingAnimC.style.parentNode) {
+                        LoadingAnimC.style = _GM_addStyle(LoadingAnimC.style.innerText);
+                    }
+                    return;
+                }
+                LoadingAnimC.style=_GM_addStyle('\
                 .pv-loading-container {\
                 position: absolute;\
                 z-index:999999997;\
@@ -19608,6 +24642,7 @@ ImgOps | https://imgops.com/#b#`;
                 box-shadow: 2px 2px 0px #666;\
                 -webkit-transition: opacity 0.15s ease-in-out;\
                 transition: opacity 0.15s ease-in-out;\
+                width: initial;\
                 }\
                 .pv-loading-container:hover {\
                 opacity: 0.9;\
@@ -19628,10 +24663,12 @@ ImgOps | https://imgops.com/#b#`;
                 opacity: 1;\
                 }\
                 .pv-loading-cancle{\
+                pointer-events: all;\
                 background-image: url("'+prefs.icons.loadingCancle+'");\
                 }\
                 .pv-loading-retry{\
                 display:none;\
+                pointer-events: all;\
                 background-image: url("'+prefs.icons.retry+'");\
                 }\
                 .pv-loading-container_error{\
@@ -19650,15 +24687,19 @@ ImgOps | https://imgops.com/#b#`;
                 .pv-loading-container_error .pv-loading-retry{\
                 display:block;\
                 }\
-                ';
-                document.head.appendChild(style);
+                ');
             },
             remove:function(){
                 if(!this.removed){
+                    lastPopupLoading = null;
                     this.removed=true;
                     this.loadingAnim.parentNode.removeChild(this.loadingAnim);
                     LoadingAnimC.all.splice(LoadingAnimC.all.indexOf(this),1);
                 };
+            },
+            cancel:function(){
+                this.imgReady && this.imgReady.abort();
+                this.remove();
             },
             error:function(msg,img,e){
                 if(msg)debug(msg);
@@ -19672,6 +24713,7 @@ ImgOps | https://imgops.com/#b#`;
                 },3000);
             },
             setPosition:function(){
+                if (!this.data.img) return;
                 var position=getContentClientRect(this.data.img);
                 var cs=this.loadingAnim.style;
                 var scrolled=getScrolled();
@@ -19681,11 +24723,56 @@ ImgOps | https://imgops.com/#b#`;
             },
 
             // 根据 imgSrc 载入图片，imgSrcs 为备用图片地址，imgSrc 加载失败备用
-            loadImg: function(imgSrc, imgSrcs, nextFun) {
+            loadImg: async function(imgSrc, imgSrcs, nextFun) {
                 var self = this;
 
-                var img = document.createElement('img');
-                img.src = imgSrc;
+                var mode = matchedRule.getMode(imgSrc);
+                var media;
+                let loaded = function() {
+                    media.play();
+                    self.load(this || media);
+                    media.removeEventListener('loadeddata', loaded);
+                }
+                if (this.buttonType === 'magnifier') {
+                    media = document.createElement('img');
+                    media.src = (mode === "video" || mode === "audio") ? this.data.imgSrc : imgSrc;
+                    mode = "";
+                } else {
+                    switch (mode) {
+                        case "video":
+                            media = createVideo();
+                            media.style.width = 0;
+                            media.style.height = 0;
+                            media.controls = true;
+                            media.loop = true;
+                            media.autoplay = true;
+                            media.volume = matchedRule.mute ? 0 : 1;
+                            imgSrc = imgSrc.replace(/^video:/, "");
+                            if (imgSrc.indexOf('.mkv') !== -1) media.type = 'video/mp4';
+                            else if (imgSrc.indexOf('.m3u8') !== -1) {
+                                try {
+                                    loaded();
+                                    await initVideojs(media, imgSrc);
+                                    imgSrc = "";
+                                } catch (error) {
+                                    console.error('Failed to load or initialize Video.js player:', error);
+                                }
+                            }
+                            break;
+                        case "audio":
+                            media = document.createElement('audio');
+                            media.controls = true;
+                            media.autoplay = true;
+                            media.volume = matchedRule.mute ? 0 : 1;
+                            imgSrc = imgSrc.replace(/^audio:/, "");
+                            break;
+                        default:
+                            media = document.createElement('img');
+                            break;
+                    }
+                    if (imgSrc) media.src = imgSrc;
+                    curLoadingMedia = media;
+                }
 
                 var opts = {
                     error: function(e) {
@@ -19695,10 +24782,10 @@ ImgOps | https://imgops.com/#b#`;
                                 self.loadImg(src, imgSrcs, nextFun);
                                 return;
                             }
+                        } else {
+                            if(nextFun) nextFun();
+                            else self.error('', this, e);
                         }
-
-                        if(nextFun) nextFun();
-                        else self.error('', this, e);
                     },
                 };
 
@@ -19706,10 +24793,18 @@ ImgOps | https://imgops.com/#b#`;
                     self.load(this, e);
                 };
 
-                self.imgReady = imgReady(img, opts);
+                if (mode === 'video' || mode === 'audio') {
+                    if (imgSrc) {
+                        media.addEventListener('loadeddata', loaded);
+                        media.load();
+                    }
+                } else {
+                    self.imgReady = imgReady(media, opts);
+                }
             },
 
-            load:function(img,e){
+            load:async function(img,e){
+                lastPopupLoading = null;
                 this.remove();
                 this.img=img;
                 var buttonType=this.buttonType;
@@ -19719,13 +24814,13 @@ ImgOps | https://imgops.com/#b#`;
                         gallery=new GalleryC();
                         gallery.data=[];
                     }
-                    var allData=gallery.getAllValidImgs();
+                    var allData=await gallery.getAllValidImgs();
                     allData.target=this.data;
                     this.data=allData;
                 };
 
                 var self=this;
-                function openInTop(){
+                async function openInTop(){
                     var data=self.data;
 
                     //删除不能发送的项。
@@ -19746,6 +24841,15 @@ ImgOps | https://imgops.com/#b#`;
                         delCantClone(data);
                     };
 
+                    if(!gallery){
+                        gallery=new GalleryC();
+                        gallery.data=[];
+                    }
+                    let allData=(await gallery.getAllValidImgs()).map(item => item.src);
+                    allData = allData.filter((item, index) => {
+                        return allData.indexOf(item) === index;
+                    });
+                    data.all = allData;
                     window.postMessage({
                         messageID:messageID,
                         src:img.src,
@@ -19756,7 +24860,7 @@ ImgOps | https://imgops.com/#b#`;
                     },'*');
                 };
 
-                if(this.openInTopWindow && isFrame && topWindowValid!==false && buttonType!='magnifier'){
+                if(this.openInTopWindow && isFrame && topWindowValid!==false && buttonType!='magnifier' && buttonType!='download' && !isLargeFrame()){
                     if(topWindowValid){
                         openInTop();
                     }else{//先发消息问问顶层窗口是不是非frameset窗口
@@ -19785,51 +24889,88 @@ ImgOps | https://imgops.com/#b#`;
             open:function(){
                 switch(this.buttonType){
                     case 'popup':
+                        if(uniqueImgWin && uniqueImgWin.src != this.data.src && (!this.data.srcs || !this.data.srcs.includes(uniqueImgWin.src))){
+                            uniqueImgWin.remove();
+                        }
                         if(!uniqueImgWin || uniqueImgWin.removed){
-                            uniqueImgWin = new ImgWindowC(this.img, this.data);
+                            this.data.src=this.img.src;
+                            uniqueImgWin = new ImgWindowC(this.img, this.data, null, null, true);
                             //uniqueImgWin.imgWindow.classList.add("pv-pic-window-transition-all");
                         }
-                        if(uniqueImgWin.src != this.data.src && (!this.data.srcs || !this.data.srcs.includes(uniqueImgWin.src))){
-                            uniqueImgWin.changeData(this.data);
-                        }
-                        uniqueImgWin.blur({target:this.data.img});
+                        //uniqueImgWin.blur({target:this.data.img});
                         if(!uniqueImgWin.loaded){
                             if(prefs.waitImgLoad){
                                 uniqueImgWin.imgWindow.style.display = "none";
                                 uniqueImgWin.imgWindow.style.opacity = 0;
                             }else{
-                                uniqueImgWin.center(true,true);
-                                if(centerInterval)clearInterval(centerInterval);
-                                centerInterval=setInterval(function(){
-                                    if(!uniqueImgWin || uniqueImgWin.removed || uniqueImgWin.loaded)
-                                        clearInterval(centerInterval);
-                                    else{
-                                        uniqueImgWin.center(true,true);
-                                    }
-                                },300);
+                                if (prefs.floatBar.globalkeys.previewFollowMouse) {
+                                    uniqueImgWin.followPos(uniqueImgWinInitX, uniqueImgWinInitY);
+                                } else {
+                                    uniqueImgWin.initMaxSize();
+                                    uniqueImgWin.center(true,true);
+                                    if(centerInterval)clearInterval(centerInterval);
+                                    centerInterval=setInterval(function(){
+                                        if(!uniqueImgWin || uniqueImgWin.removed || uniqueImgWin.loaded){
+                                            clearInterval(centerInterval);
+                                        }else{
+                                            uniqueImgWin.center(true,true);
+                                        }
+                                    },300);
+                                }
                             }
                         }
-                        uniqueImgWin.imgWindow.style.pointerEvents = "none";
+                        uniqueImgWin.imgWindow.classList.add("preview");
                         break;
                     case 'gallery':
                         if(!gallery){
                             gallery=new GalleryC();
                         };
                         gallery.load(this.data,this.from);
+                        gallery.changeMinView();
                         break;
                     case 'magnifier':
                         new MagnifierC(this.img,this.data);
+                        break;
+                    case 'download':
+                        downloadImg(this.data.src || this.data.imgSrc, (this.data.img.title || this.data.img.alt), prefs.saveName, null, this.data);
+                        break;
+                    case "copy":
+                        _GM_setClipboard(this.data.src || this.data.imgSrc);
+                        break;
+                    case "open":
+                        _GM_openInTab(this.data.src || this.data.imgSrc, {active:false});
+                        break;
+                    case "copyImg":
+                        copyData(this.data.src || this.data.imgSrc);
                         break;
                     case 'actual':
                     case 'search':
                     case 'current':
                     case 'original'://original 是为了兼容以前的规则
                         if(this.data.src!=this.img.src)this.data.src=this.img.src;
-                        new ImgWindowC(this.img, this.data);
+                        new ImgWindowC(this.img, this.data, this.buttonType == 'actual', this.initPos || false);
                         break;
                 };
             },
         };
+
+        function copyData(url) {
+            if (typeof ClipboardItem != 'undefined') {
+                urlToBlob(url, (blob, ext) => {
+                    if (blob) {
+                        try {
+                            navigator.clipboard.write([
+                                new ClipboardItem({
+                                    [blob.type]: blob
+                                })
+                            ]);
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                }, true);
+            } else _GM_setClipboard(url);
+        }
 
         //工具栏
         function FloatBarC(){
@@ -19841,8 +24982,8 @@ ImgOps | https://imgops.com/#b#`;
                 this.addStyle();
                 var container=document.createElement('span');
                 container.id='pv-float-bar-container';
-                document.body.appendChild(container);
-                for(let i=0;i<5;i++){
+                getBody(document).appendChild(container);
+                for(let i=0;i<prefs.floatBar.butonOrder.length;i++){
                     let spanChild=document.createElement('span');
                     spanChild.className='pv-float-bar-button';
                     container.appendChild(spanChild);
@@ -19867,6 +25008,7 @@ ImgOps | https://imgops.com/#b#`;
                         current:i18n("currentBtn").replace(/ ?\(C\)/,` (${prefs.floatBar.keys.current.toUpperCase()})`),
                         magnifier:i18n("magnifierBtn").replace(/ ?\(M\)/,` (${prefs.floatBar.keys.magnifier.toUpperCase()})`),
                         download:i18n("download")+` (${prefs.floatBar.keys.download.toUpperCase()})`,
+                        stitch:i18n("stitch"),
                     };
                     var buttonName=prefs.floatBar.butonOrder[index];
                     if(!buttonName){
@@ -19876,6 +25018,7 @@ ImgOps | https://imgops.com/#b#`;
                     buttons[buttonName]=child;
                     child.title=titleMap[buttonName];
                     child.classList.add('pv-float-bar-button-' + buttonName);
+                    child.style.zIndex = Math.max(1, prefs.floatBar.butonOrder.length - index);
                 });
 
 
@@ -19883,6 +25026,12 @@ ImgOps | https://imgops.com/#b#`;
 
 
                 var self=this;
+                document.addEventListener('click',function(e){
+                    if(self.ignoreEvents || e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) || container.contains(e.target))return;
+                    self.hide();
+                    self.ignoreEvents=true;
+                    setTimeout(() => self.ignoreEvents=false,1000);
+                },true);
                 container.addEventListener('click',function(e){
                     var buttonType;
                     var target=e.target;
@@ -19895,8 +25044,8 @@ ImgOps | https://imgops.com/#b#`;
                     };
                     if(!buttonType)return;
 
-                    self.hide();
                     self.open(e,buttonType);
+                    self.hide();
 
                 },true);
 
@@ -19917,12 +25066,19 @@ ImgOps | https://imgops.com/#b#`;
                 this._scrollHandler=this.scrollHandler.bind(this);
             },
             addStyle:function(){
-                var style=document.createElement('style');
-                style.type='text/css';
-                style.textContent='\
+                if (FloatBarC.style) {
+                    if (!FloatBarC.style.parentNode) {
+                        FloatBarC.style = _GM_addStyle(FloatBarC.style.innerText);
+                    }
+                    return;
+                }
+                FloatBarC.style=_GM_addStyle('\
                     #pv-float-bar-container {\
                     position: absolute;\
-                    z-index:9999999998;\
+                    background-image: initial;\
+                    top: 0px;\
+                    left: 0px;\
+                    z-index:2147483640;\
                     padding: 5px;\
                     margin: 0;\
                     border: none;\
@@ -19975,39 +25131,52 @@ ImgOps | https://imgops.com/#b#`;
                     margin-right: 4px;\
                     }\
                     #pv-float-bar-container .pv-float-bar-button-actual {\
-                    background-image:url("'+ prefs.icons.actual +'");\
+                    background-image:url("'+ prefs.icons.actual +'")!important;\
                     }\
                     #pv-float-bar-container .pv-float-bar-button-search {\
-                    background-image:url("'+ prefs.icons.search +'");\
+                    background-image:url("'+ prefs.icons.search +'")!important;\
                     }\
                     #pv-float-bar-container .pv-float-bar-button-gallery {\
-                    background-image:url("'+ prefs.icons.gallery +'");\
+                    background-image:url("'+ prefs.icons.gallery +'")!important;\
                     }\
                     #pv-float-bar-container .pv-float-bar-button-current {\
-                    background-image:url("'+ prefs.icons.current +'");\
+                    background-image:url("'+ prefs.icons.current +'")!important;\
                     }\
                     #pv-float-bar-container .pv-float-bar-button-magnifier {\
-                    background-image:url("'+ prefs.icons.magnifier +'");\
+                    background-image:url("'+ prefs.icons.magnifier +'")!important;\
                     }\
                     #pv-float-bar-container .pv-float-bar-button-download {\
-                    background-image:url("'+ prefs.icons.download +'");\
+                    background-image:url("'+ prefs.icons.download +'")!important;\
                     }\
-                    ';
-                document.head.appendChild(style);
+                    #pv-float-bar-container .pv-float-bar-button-stitch {\
+                    background-image:url("'+ prefs.icons.stitch +'")!important;\
+                    }\
+                    ');
             },
             start:function(data){
+                data.pageUrl = data.pageUrl || location.href;
+                data.pageTitle = data.pageTitle || document.title;
+                const link = data.img && data.img.closest && data.img.closest('a[href]');
+                data.iPASrc = data.iPASrc || (link && link.href) || '';
+                if (stitcher && stitcher.selecting) {
+                    this.hide();
+                    return false;
+                }
 
+                if (data && data.type == "link") {
+                    data.hide = true;
+                }
                 //读取中的图片,不显示浮动栏,调整读取图标的位置.
-                if(LoadingAnimC.all._find(function(item,index,array){
-                    if(data.img==item.data.img){
+                if(LoadingAnimC.all.find(function(item,index,array){
+                    if (data.src == item.data.src || data.img == item.data.img) {
                         return true;
-                    };
-                }))return false;
+                    }
+                })) return false;
 
 
                 //被放大镜盯上的图片,不要显示浮动栏.
-                if(MagnifierC.all._find(function(item,index,array){
-                    if(data.img==item.data.img){
+                if(MagnifierC.all.find(function(item,index,array){
+                    if(data.src==item.data.src){
                         return true;
                     };
                 }))return false;
@@ -20030,9 +25199,11 @@ ImgOps | https://imgops.com/#b#`;
                 },150);
 
                 clearTimeout(this.showTimer);
-                if(prefs.floatBar.position=="hide"){
-                    self.data=data;
-                    self.show();
+                self.data=data;
+                if (data.hide) {
+                    this.show();
+                    this.floatBar.style.display = 'none';
+                    this.floatBar.style.opacity = 0;
                     return false;
                 }
                 if(!this.shown || self.data.img!=data.img){
@@ -20040,23 +25211,26 @@ ImgOps | https://imgops.com/#b#`;
                     this.floatBar.style.opacity=0.01;
                 }
                 this.showTimer=setTimeout(function(){
-                    self.data=data;
                     self.show();
                 },prefs.floatBar.showDelay);
                 return true;
             },
             setButton:function(){
-                if(this.data.noActual){
-                    this.buttons['actual'].style.display='none';
-                }else{
-                    this.buttons['actual'].style.removeProperty('display');
+                if(this.buttons['actual']){
+                    if(this.data.noActual){
+                        this.buttons['actual'].style.display='none';
+                    }else{
+                        this.buttons['actual'].style.removeProperty('display');
+                    }
                 }
-                if(this.data.type != "force" && this.data.img.nodeName == 'IMG'){
-                    this.buttons['magnifier'].style.removeProperty('display');
-                }else{
-                    this.buttons['magnifier'].style.display='none';
+                if(this.buttons['magnifier']){
+                    if(this.data.type != "force" && this.data.img.nodeName.toUpperCase() == 'IMG'){
+                        this.buttons['magnifier'].style.removeProperty('display');
+                    }else{
+                        this.buttons['magnifier'].style.display='none';
+                    }
                 }
-                if (this.data.img.nodeName != 'IMG') {
+                if (this.data.img.nodeName.toUpperCase() != 'IMG') {
                     //this.buttons['gallery'].style.display = 'none';
                     //this.buttons['current'].style.display = 'none';
                 } else {
@@ -20064,13 +25238,52 @@ ImgOps | https://imgops.com/#b#`;
                     //this.buttons['current'].style.removeProperty('display');
                 }
             },
-            setPosition:function(){
+            setPosition: function() {
                 //如果图片被删除了，或者隐藏了。
-                if(this.data.img.offsetWidth==0){
+                if (this.data.img.offsetWidth == 0) {
                     return true;
-                };
-                var targetPosi=getContentClientRect(this.data.img);
-                var bodyPosi=getContentClientRect(document.body);
+                }
+                var targetPosi = getContentClientRect(this.data.img);
+                var pa = this.data.img.parentNode, limited = false;
+                if (pa && pa.scrollHeight > 30 && pa.scrollWidth > 30) {
+                    var paPosi=pa.getBoundingClientRect();
+                    if (paPosi.width > 30 && paPosi.height > 30) {
+                        const style = unsafeWindow.getComputedStyle(this.data.img);
+                        const matrix = new DOMMatrixReadOnly(style.transform);
+                        let translateX = matrix.m41, translateY = matrix.m42, scaleX = matrix.m11, scaleY = matrix.m22;
+                        if (translateY || this.data.img.offsetTop != 0 || (scaleY && scaleY !== 1)) {
+                            if (paPosi.height < targetPosi.height - 3) {
+                                limited = true;
+                                targetPosi.top = paPosi.top;
+                            }
+                        }
+                        if (translateX || this.data.img.offsetLeft != 0 || (scaleX && scaleX !== 1)) {
+                            if (paPosi.width < targetPosi.width - 3) {
+                                limited = true;
+                                targetPosi.left = paPosi.left;
+                            }
+                        }
+                    }
+                }
+                pa = this.data.img.offsetParent;
+                if (pa && !limited) {
+                    paPosi=pa.getBoundingClientRect();
+                    if (paPosi.width > 30 && paPosi.height > 30) {
+                        const style = unsafeWindow.getComputedStyle(this.data.img);
+                        const matrix = new DOMMatrixReadOnly(style.transform);
+                        let translateX = matrix.m41, translateY = matrix.m42, scaleX = matrix.m11, scaleY = matrix.m22;
+                        if (translateY || this.data.img.offsetTop != 0 || (scaleY && scaleY !== 1)) {
+                            if (paPosi.height < targetPosi.height - 3) {
+                                targetPosi.top = paPosi.top;
+                            }
+                        }
+                        if (translateX || this.data.img.offsetLeft != 0 || (scaleX && scaleX !== 1)) {
+                            if (paPosi.width < targetPosi.width - 3) {
+                                targetPosi.left = paPosi.left;
+                            }
+                        }
+                    }
+                }
                 var windowSize=getWindowSize();
                 var img=this.data.img;
 
@@ -20079,88 +25292,97 @@ ImgOps | https://imgops.com/#b#`;
                 var offsetX=prefs.floatBar.offset.x;
                 var offsetY=prefs.floatBar.offset.y;
 
+                let body = getBody(document);
+                let bodyStyle = unsafeWindow.getComputedStyle(body);
+                let offsetParent, bodyPosi;
 
-                var scrolled=getScrolled();
-                targetPosi.top -= bodyPosi.top + scrolled.y;
-                targetPosi.left -= bodyPosi.left + scrolled.x;
+                if (bodyStyle.position === "static") {
+                    offsetParent = document.documentElement;
+                    bodyPosi = body.getBoundingClientRect();
+                    let docPosy = offsetParent.getBoundingClientRect();
+                    if (bodyPosi.top == docPosy.top && bodyPosi.left == docPosy.left && bodyPosi.bottom == docPosy.bottom && bodyPosi.right == docPosy.right) {
+                        bodyPosi = {
+                            top: -offsetParent.scrollTop,
+                            left: -offsetParent.scrollLeft,
+                            bottom: offsetParent.scrollHeight - offsetParent.scrollTop,
+                            right: offsetParent.scrollWidth - offsetParent.scrollLeft
+                        };
+                    }
+                } else {
+                    offsetParent = body;
+                    bodyPosi = offsetParent.getBoundingClientRect();
+                }
 
-                var fbs=this.floatBar.style;
-                var setPosition={
-                    top:function(){
-                        var top=targetPosi.top + scrolled.y;
-                        if(targetPosi.top + offsetY < 0){//满足图标被遮住的条件.
-                            top=scrolled.y;
-                            offsetY=0;
+
+                var scrolled=getScrolled(offsetParent);
+                targetPosi.top = targetPosi.top - bodyPosi.top;
+                targetPosi.left = targetPosi.left - bodyPosi.left;
+                targetPosi.bottom = bodyPosi.bottom - targetPosi.bottom;
+                targetPosi.right = bodyPosi.right - targetPosi.right;
+
+                var fbs = this.floatBar.style;
+                var setPosition = {
+                    top:function() {
+                        var top = targetPosi.top;
+                        if (top + offsetY - scrolled.y < 10) {
+                            top = scrolled.y;
+                            offsetY = 0;
+                        } else {
+                            if (prefs.floatBar.stayOut) {
+                                top = top + offsetY - 10 - prefs.floatBar.stayOutOffsetY;
+                            } else {
+                                top = top + offsetY;
+                            }
+                            if (targetPosi.height <= 50) top -= 10;
                         }
-                        if(prefs.floatBar.stayOut){
-                            top=top + offsetY - 10 - prefs.floatBar.stayOutOffsetY;
-                        }else{
-                            top=top + offsetY;
-                        }
-                        if(targetPosi.height<=50)top-=10;
-                        fbs.top=top + 'px';
+                        fbs.bottom = 'unset';
+                        fbs.top = top + 'px';
                     },
-                    right:function(){
-                        var right=windowSize.w - targetPosi.right;
-                        if(right < offsetX){
-                            right= -scrolled.x;
-                            offsetX=0;
-                        }else{
-                            right -=scrolled.x;
+                    right:function() {
+                        var right = targetPosi.right;
+                        if (prefs.floatBar.stayOut) {
+                            right = right - offsetX - prefs.floatBar.stayOutOffsetX;
+                        } else {
+                            right = right - offsetX;
                         }
-                        if(prefs.floatBar.stayOut){
-                            right=right - offsetX - prefs.floatBar.stayOutOffsetX;
-                        }else{
-                            right=right - offsetX;
-                        }
-                        if(targetPosi.width<=50)right+=10;
-                        fbs.right=right + 'px';
+                        if (targetPosi.width <= 50) right += 10;
+                        fbs.left = 'unset';
+                        fbs.right = right + 'px';
                     },
-                    bottom:function(){
-                        var bottom=windowSize.h - targetPosi.bottom;
-                        if(bottom <= offsetY){
-                            bottom=-scrolled.y;
-                            offsetY=0;
-                        }else{
-                            bottom -= scrolled.y;
+                    bottom:function() {
+                        var bottom = targetPosi.bottom;
+                        if (prefs.floatBar.stayOut) {
+                            bottom = bottom - offsetY - 40 - prefs.floatBar.stayOutOffsetY;
+                        } else {
+                            bottom = bottom - offsetY - 30;
                         }
-                        if(prefs.floatBar.stayOut){
-                            bottom=bottom - offsetY - 40 - prefs.floatBar.stayOutOffsetY;
-                        }else{
-                            bottom=bottom - offsetY - 30;
-                        }
-                        if(targetPosi.height<=50)bottom+=10;
-                        fbs.bottom=bottom + 'px';
+                        if (targetPosi.height <= 50) bottom += 10;
+                        fbs.top = 'unset';
+                        fbs.bottom = bottom + 'px';
                     },
-                    left:function(){
-                        var left=targetPosi.left + scrolled.x;
-                        if(targetPosi.left + offsetX < 0){
-                            left=scrolled.x;
-                            offsetX=0;
+                    left:function() {
+                        var left = targetPosi.left;
+                        if (left + offsetX - scrolled.x < 0) {
+                            left = scrolled.x;
+                            offsetX = 0;
+                        } else {
+                            if (prefs.floatBar.stayOut) {
+                                left = left + offsetX - prefs.floatBar.stayOutOffsetX;
+                            } else {
+                                left = left + offsetX;
+                            }
+                            if (targetPosi.width <= 50) left -= 10;
                         }
-                        if(prefs.floatBar.stayOut){
-                            left=left + offsetX - prefs.floatBar.stayOutOffsetX;
-                        }else{
-                            left=left + offsetX;
-                        }
-                        if(targetPosi.width<=50)left-=10;
-                        fbs.left=left + 'px';
+                        fbs.right = 'unset';
+                        fbs.left = left + 'px';
                     },
-                    center:function(){
-                        var left=targetPosi.left + scrolled.x + offsetX;
-                        fbs.left=left + img.width/2 + 'px';
+                    center:function() {
+                        var left = targetPosi.left + offsetX;
+                        fbs.left = left + targetPosi.width / 2 + 'px';
                     },
                     hide:function(){
-                        var top=targetPosi.top + scrolled.y;
-                        if(targetPosi.top + offsetY < 0){
-                            top=scrolled.y;
-                            offsetY=0;
-                        }
-                        var left=targetPosi.left + scrolled.x;
-                        if(targetPosi.left + offsetX < 0){
-                            left=scrolled.x;
-                            offsetX=0;
-                        }
+                        var top=targetPosi.top;
+                        var left=targetPosi.left;
                         if(prefs.floatBar.stayOut){
                             top=top + offsetY - 10 - prefs.floatBar.stayOutOffsetY;
                             left=left + offsetX - prefs.floatBar.stayOutOffsetX;
@@ -20183,17 +25405,17 @@ ImgOps | https://imgops.com/#b#`;
             show:function(){
                 if(this.setPosition())return;
                 this.shown=true;
+                this.addStyle();
                 this.setButton();
-                if(prefs.floatBar.position!=="hide"){
-                    this.floatBar.style.transition="";
-                    this.floatBar.style.display='block';
-                    this.floatBar.style.opacity="";
-                }
+                this.floatBar.style.transition="";
+                this.floatBar.style.display='block';
+                this.floatBar.style.opacity="";
                 clearTimeout(this.hideTimer);
                 window.removeEventListener('scroll',this._scrollHandler,true);
                 window.addEventListener('scroll',this._scrollHandler,true);
             },
             hide:function(){
+                target = null;
                 clearTimeout(this.showTimer);
                 this.floatBar.style.opacity=0.01;
                 this.shown=false;
@@ -20207,10 +25429,67 @@ ImgOps | https://imgops.com/#b#`;
                     self.setPosition();
                 },100);
             },
-            open:function(e,buttonType){
-                if(buttonType=='download'){
-                    _GM_download(this.data.src||this.data.imgSrc, (this.data.img.alt||document.title)+".jpg");
+            open:async function(e,buttonType){
+                if (!this.shown || !this.data || !this.data.imgSrc) return;
+                if (window.getSelection().toString()) return;
+                if (buttonType === 'stitch') {
+                    if (ImgWindowC.all && ImgWindowC.all.length) {
+                        ImgWindowC.all.slice(0).forEach(win => win.remove(true));
+                    }
+                    if (stitcher) stitcher.openSelect();
                     return;
+                }
+                if (this.data.imgSrc.indexOf("blob:") === 0) {
+                    let blobUrl = await getBase64FromBlobUrl(this.data.imgSrc);
+                    if (blobUrl) {
+                        let sameSrc = (this.data.src === this.data.imgSrc);
+                        this.data.imgSrc = blobUrl;
+                        this.data.srcs = [this.data.imgSrc];
+                        if (sameSrc) {
+                            this.data.src = blobUrl;
+                        }
+                    }
+                }
+                if (buttonType === 'download' && !this.data.xhr) {
+                    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+                    downloadImg(this.data.src || this.data.imgSrc, (this.data.img.title || this.data.img.alt), prefs.saveName, null, this.data);
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                } else {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    let altKey = e.altKey;
+                    if (e.type != "click" && prefs.floatBar.globalkeys.invertInitShow && prefs.floatBar.globalkeys.alt) {
+                        altKey = false;
+                    }
+                    let additionEnable = prefs.floatBar.invertAdditionalFeature ? !altKey : altKey;
+                    if (additionEnable) {
+                        let src, feature = prefs.floatBar.additionalFeature;
+                        if (buttonType == 'actual') {
+                            if (this.data.xhr) {
+                                buttonType = feature || "open";
+                            } else {
+                                src = this.data.src || this.data.imgSrc;
+                            }
+                        } else if (buttonType == 'current') {
+                            src = this.data.imgSrc;
+                        }
+                        if (src) {
+                            switch(feature) {
+                                case "copy":
+                                    _GM_setClipboard(src);
+                                    break;
+                                case "open":
+                                    _GM_openInTab(src, {active:false});
+                                    break;
+                                case "copyImg":
+                                    copyData(src);
+                                    break;
+                            }
+                            return;
+                        }
+                    }
                 }
                 var waitImgLoad = e && e.ctrlKey ? !prefs.waitImgLoad : prefs.waitImgLoad; //按住ctrl取反向值
                 var openInTopWindow = e && e.shiftKey ? !prefs.framesPicOpenInTopWindow : prefs.framesPicOpenInTopWindow; //按住shift取反向值
@@ -20218,6 +25497,9 @@ ImgOps | https://imgops.com/#b#`;
                     waitImgLoad = true;
                 };
                 new LoadingAnimC(this.data, buttonType, waitImgLoad, openInTopWindow);
+                if (e.type == "click") {
+                    floatBar.hide();
+                }
             },
             update:function(img,src){
                 if(this.data.img==img && this.data.imgSrc!=src){
@@ -20239,66 +25521,109 @@ ImgOps | https://imgops.com/#b#`;
 
             var caches = {};
             var handleError;
+            var cacheNum = 0;
+            var xhr;
+            var useFetch = false;
 
             /**
             * @param  q  图片的选择器或函数
             * @param  c  图片说明的选择器或函数
             */
-            function parsePage(url, q, c, post, cb) {
-                downloadPage(url, post, function(html) {
-                    var iurl, iurls = [], cap, doc = createDoc(html);
+            function parsePage(url, q, c, post, cb, headers, after) {
+                downloadPage(url, post, headers, async function(html) {
+                    var iurl, iurls = [], cap, caps, doc = createDoc(html);
 
                     if(typeof q == 'function') {
-                        iurl = q(html, doc);
+                        iurl = await q(html, doc, url + (post ? `#p{${post}}` : ""), xhr, GM_fetch);
+                        if (iurl) {
+                            if(iurl.url) {
+                                cap = iurl.cap;
+                                iurl = iurl.url;
+                            }
+                            if (Array.isArray(iurl)) {
+                                iurl = iurl.map(u => after(u));
+                                iurls = iurl;
+                                iurl = iurls[0];
+                            } else iurl = after(iurl);
+                        }
                     } else {
                         var inodes = findNodes(q, doc);
                         inodes.forEach(function(node) {
-                            iurls.push(findFile(node, url));
+                            iurls.push(after(findFile(node, url)));
                         });
-                        iurl = iurls.shift();
+                        iurl = iurls[0];
                     }
 
-                    if(typeof c == 'function') {
-                        cap = c(html, doc);
-                    } else {
-                        var cnodes = findNodes(c, doc);
-                        cap = cnodes.length ? findCaption(cnode[0]) : false;
+                    if (c) {
+                        if(typeof c == 'function') {
+                            cap = await c(html, doc, url, xhr);
+                        } else {
+                            var cnodes = findNodes(c, doc);
+                            cap = cnodes.length ? findCaption(cnodes[0]) : false;
+                        }
+                        if (Array.isArray(cap)) {
+                            caps = cap;
+                            cap = caps[0];
+                        }
                     }
 
                     // 缓存
                     if (iurl) {
-                        caches[url] = {
+                        let cacheData = {
                             iurl: iurl,
                             iurls: iurls,
-                            cap: cap
+                            cap: cap,
+                            caps: caps
                         };
+                        caches[url + (post || "")] = cacheData;
+                        if (cacheNum) {
+                            storage.setListItem("xhrCache", url + (post || ""), cacheData, cacheNum);
+                        }
                     }
 
-                    cb(iurl, iurls, cap);
+                    cb(iurl, iurls, cap, caps);
                 });
             }
 
-            function downloadPage(url, post, cb) {
+            async function downloadPage(url, post, headers, cb) {
                 var opts = {
                     method: 'GET',
                     url: url,
                     onload: function(req) {
                         try {
                             if(req.status > 399) throw 'Server error: ' + req.status;
-                            cb(req.responseText, req.finalUrl || url);
+                            else cb(req.responseText, req.finalUrl || url);
                         } catch(ex) {
+                            if (!useFetch && req.responseHeaders.indexOf("cloudflare") != -1) {
+                                useFetch = true;
+                                return downloadPage(url, post, headers, cb);
+                            }
                             handleError(ex);
                         }
                     },
                     onerror: handleError
                 };
-                if(post) {
+                if (post) {
                     opts.method = 'POST';
                     opts.data = post;
                     opts.headers = {'Content-Type':'application/x-www-form-urlencoded','Referer':url};
                 }
+                if (headers) {
+                    if (typeof headers == 'function') {
+                        headers = await headers(url + (post ? `#p{${post}}` : ""), xhr, getCookie);
+                    }
+                    opts.headers = headers;
+                }
 
-                _GM_xmlhttpRequest(opts);
+                if (useFetch) {
+                    let fetchOption = {method: opts.method || 'GET', headers: opts.headers};
+                    if (opts.method && opts.method != 'GET') {
+                        fetchOption.body = opts.data || '';
+                    }
+                    fetch(opts.url, fetchOption).then(response => response.text()).then(data => {opts.onload({responseText: data})}).catch(e => opts.onerror(e));
+                } else {
+                    _GM_xmlhttpRequest(opts);
+                }
             }
 
             function createDoc(text) {
@@ -20313,15 +25638,23 @@ ImgOps | https://imgops.com/#b#`;
                 if (!Array.isArray(q)) q = [q];
                 for (var i = 0, len = q.length; i < len; i++) {
                     node = qs(q[i], doc);
-                    if (node) {
-                        nodes.push(node);
+                    if (node && node.length) {
+                        [].forEach.call(node, n => {
+                            nodes.push(n);
+                        });
                     }
                 }
                 return nodes;
             }
 
             function findFile(n, url) {
-                var path = n.src || n.href;
+                pretreatment(n, true);
+                var path = (n.dataset && n.dataset.src) || n.src || n.href || (n.children && n.children[0] &&  n.children[0].src);
+                if (/^video$/i.test(n.nodeName)) {
+                    path = "video:" + path;
+                } else if (/^audio$/i.test(n.nodeName)) {
+                    path = "audio:" + path;
+                } else if (path.baseVal) path = path.baseVal;
                 return path ? path.trim() : false;
             }
 
@@ -20330,19 +25663,26 @@ ImgOps | https://imgops.com/#b#`;
             }
 
             function qs(s, n) {
-                return n.querySelector(s);
+                return n.querySelectorAll(s);
             }
 
             _.load = function(opt) {
-                var info = caches[opt.url];
+                xhr = opt.xhr;
+                var info = caches[opt.url] || storage.getListItem("xhrCache", opt.url);
+                cacheNum = xhr.cacheNum || 0;
                 if (info) {
-                    opt.cb(info.iurl, info.iruls, info.cap);
+                    opt.cb(info.iurl, info.iurls, info.cap, info.caps);
                     return;
                 }
 
                 handleError = opt.onerror || function() {};
+                let postParams = opt.url.match(/#p{(.*)}$/);
+                if (!opt.post && postParams) {
+                    opt.post = postParams[1];
+                    opt.url = opt.url.replace(/#p{.*/, "");
+                }
 
-                parsePage(opt.url, opt.xhr.q, opt.xhr.c, opt.post, opt.cb);
+                parsePage(opt.url, xhr.query || xhr.q, xhr.caption || xhr.c, opt.post, opt.cb, xhr.headers, xhr.after);
             };
 
             return _;
@@ -20351,40 +25691,38 @@ ImgOps | https://imgops.com/#b#`;
 
         // ------------------- run -------------------------
 
-        var matchedRule,
-            URL=location.href;
-
-        function pretreatment(img){
-            if(img.nodeName != "IMG" || img.src)return;
-            if(img._lazyrias && img._lazyrias.srcset){
-                img.src=img._lazyrias.srcset[0];
-            }else if(img.srcset){
-                var srcs=img.srcset.split(","),minSize=0,newSrc;
-                srcs.forEach(srci=>{
-                    let srcInfo=srci.trim().split(" "),curSize=parseInt(srcInfo[1]);
-                    if(srcInfo[1] && (curSize>minSize || minSize==0)){
-                        minSize=curSize;
-                        newSrc=srcInfo[0];
+        function pretreatment(img, fetchImg) {
+            if (img.removeAttribute) img.removeAttribute("loading");
+            if (img.nodeName.toUpperCase() != "IMG" || (!fetchImg && img.src && !img.srcset && !/^data/.test(img.src))) return;
+            if (img.src && !/(^data|loading|lazy)/.test(img.src)) return;
+            let src;
+            tprules.find(function(rule, index, array) {
+                try {
+                    src = rule.call(img);
+                    if (src) {
+                        return true;
                     }
-                });
-                if(newSrc)img.src=newSrc;
-            }else if(img.currentSrc){
-                img.src=img.currentSrc;
+                } catch(err) {
+                    debug(err);
+                }
+            });
+            if (src) {
+                img.src = src;
             }
         }
 
         function findPic(img){
             var imgPN=img;
             var imgPA,imgPE=[];
-            while(imgPN=imgPN.parentElement){
-                if(imgPN.nodeName=='A'){
+            while(imgPN=imgPN.parentNode || imgPN.host){
+                if(imgPN.nodeName.toUpperCase()=='A'){
                     imgPA=imgPN;
                     break;
                 }
             }
             imgPN=img;
-            while(imgPN=imgPN.parentElement){
-                if(imgPN.nodeName=='BODY'){
+            while(imgPN=imgPN.parentNode || imgPN.host){
+                if(imgPN.nodeName.toUpperCase()=='BODY'){
                     break;
                 }else{
                     imgPE.push(imgPN);
@@ -20398,22 +25736,48 @@ ImgOps | https://imgops.com/#b#`;
                 srcs, // 备用的大图地址
                 type, // 类别
                 noActual = false, //没有原图
-                imgSrc = img.currentSrc||img.dataset.lazySrc||img.src, // img 节点的 src
+                imgSrc = img.currentSrc||img.src||img.dataset.lazySrc, // img 节点的 src
                 xhr,
                 description; // 图片的注释
-            var imgCStyle=unsafeWindow.getComputedStyle(img);
-            var imgCS={
-                h: parseFloat(imgCStyle.height)||img.height||img.offsetHeight,
-                w: parseFloat(imgCStyle.width)||img.width||img.offsetWidth,
+            var imgCStyle = unsafeWindow.getComputedStyle(img);
+            if (/^link$/i.test(img.nodeName)) {
+                imgCStyle = {height:64, width:64};
+            }
+            if (!/IMG/i.test(img.nodeName) && imgCStyle && imgCStyle.backgroundImage && imgCStyle.backgroundImage != "none") {
+                let sh = imgCStyle.height, sw = imgCStyle.width;
+                if (!img.offsetWidth) sw = 10;
+                if (!img.offsetHeight) sh = 10;
+                if (imgCStyle.backgroundRepeatX == "repeat") {
+                    sw = 10;
+                }
+                if (imgCStyle.backgroundRepeatY == "repeat") {
+                    sh = 10;
+                }
+                imgCStyle = {height:sh, width:sw};
+            }
+            var imgCS = {
+                h: parseFloat(imgCStyle.height) || img.height || img.offsetHeight,
+                w: parseFloat(imgCStyle.width) || img.width || img.offsetWidth,
             };
+            if (imgCS.h === 0 && imgCS.w === 0) {
+                for (let i = 0; i < imgPE.length; i++) {
+                    if (imgPE[i].offsetHeight) {
+                        imgCS = {
+                            h: imgPE[i].offsetHeight,
+                            w: imgPE[i].offsetWidth
+                        };
+                        break;
+                    }
+                }
+            }
             var imgAS={//实际尺寸。
-                h:img.naturalHeight||imgCS.h,
-                w:img.naturalWidth||imgCS.w,
+                h:img.naturalHeight > 1 ? img.naturalHeight : imgCS.h,
+                w:img.naturalWidth > 1 ? img.naturalWidth : imgCS.w,
             };
             if(!src && matchedRule.rules.length>0){// 通过高级规则获取.
                 // 排除
                 try{
-                    var newSrc=matchedRule.getImage(img,imgPA,imgPE);
+                    let newSrc=matchedRule.getImage(img,imgPA,imgPE);
                     if(newSrc && imgSrc!=newSrc) src=newSrc;
                 }catch(err){
                     throwErrorInfo(err);
@@ -20428,21 +25792,44 @@ ImgOps | https://imgops.com/#b#`;
                     type = 'rule';
                     xhr = matchedRule.xhr;
 
-                    if (matchedRule.lazyAttr) {  // 由于采用了延迟加载技术，所以图片可能为 loading.gif
+                    if (matchedRule.lazyAttr) { // 由于采用了延迟加载技术，所以图片可能为 loading.gif
                         imgSrc = img.getAttribute(matchedRule.lazyAttr) || img.src;
                     }
 
                     if (matchedRule.description) {
-                        var node = getElementMix(matchedRule.description, img);
+                        let desc = matchedRule.description, attr;
+                        if (Array.isArray(desc) && desc.length === 2) {
+                            attr = desc[1];
+                            desc = desc[0];
+                        }
+                        var node = getElementMix(desc, img);
                         if (node) {
-                            description = node.getAttribute('title') || node.textContent;
+                            description = attr ? node.getAttribute(attr) : (node.getAttribute('title') || node.textContent);
                         }
                     }
                 }
             }
 
+            if(/^IMG$/i.test(img.nodeName) && !src && iPASrc){//链接可能是一张图片...
+                if(iPASrc!=img.src && imageReg.test(iPASrc)){
+                    src=iPASrc;
+                    if (/[&\?]url\=/.test(src)) {
+                        src = src.replace(/.*[&\?]url\=(.*?)(&.*|$)/, "$1");
+                        try {
+                            src = decodeURIComponent(src);
+                        } catch (e) {}
+                    } else if (/[&\?]https?:/.test(src)) {
+                        src = src.replace(/.*[&\?](https?:)/, "$1");
+                        try {
+                            src = decodeURIComponent(src);
+                        } catch (e) {}
+                    }
+                }
+                if(src)type='tpRule';
+            }
+
             if(!src && !base64Img){//遍历通配规则
-                tprules._find(function(rule,index,array){
+                tprules.find(function(rule,index,array){
                     try{
                         src=rule.call(img,imgPA);
                         if(src){
@@ -20453,13 +25840,6 @@ ImgOps | https://imgops.com/#b#`;
                     };
                 });
                 if(src)type='tpRule';
-            }
-
-            if(!src && iPASrc){//链接可能是一张图片...
-                if(iPASrc!=img.src && /\.(jpg|jpeg|png|gif|bmp)(\?[^\?]*)?$/i.test(iPASrc)){
-                    src=iPASrc;
-                }
-                if(src)type='scale';
             }
 
             if(!src || src==imgSrc){//本图片是否被缩放.
@@ -20473,17 +25853,18 @@ ImgOps | https://imgops.com/#b#`;
                 }else{
                     src=imgSrc;
                     type='force';
+                    if (img.nodeName == "A") {
+                        description = img.title || img.alt || img.innerText;
+                    }
                 }
             }
 
             if(!src)return;
 
-            if(/^blob/i.test(imgSrc)){
-                imgSrc=drawTobase64(img);
-                src=imgSrc;
-            }
-
             var ret = {
+                all: matchedRule.all,
+                pageUrl: img.ownerDocument.location ? img.ownerDocument.location.href : img.ownerDocument.baseURI,
+                pageTitle: img.ownerDocument.title,
                 src: src,                  // 得到的src
                 srcs: srcs,                // 多个 src，失败了会尝试下一个
                 type: type,                // 通过哪种方式得到的
@@ -20496,7 +25877,7 @@ ImgOps | https://imgops.com/#b#`;
 
                 noActual:noActual,
                 xhr: xhr,
-                description: description || '',
+                description: description || img.title || img.alt || (img.parentNode && img.parentNode.title) || '',
 
                 img: img,                  // 处理的图片
                 imgPA: imgPA,              // 图片的第一个父a元素
@@ -20506,13 +25887,11 @@ ImgOps | https://imgops.com/#b#`;
 
         function getMatchedRule() {
             return new MatchedRuleC();
-            /*var rule = siteInfo._find(function(site, index, array) {
-                if (site.enabled != false && site.url && toRE(site.url).test(URL)) {
+            /*var rule = siteInfo.find(function(site, index, array) {
+                if (site.enabled != false && site.url && toRE(site.url).test(_URL)) {
                     return true;
                 }
             });
-
-            rule = rule ? rule[0] : false;
 
             return rule;*/
         }
@@ -20521,59 +25900,159 @@ ImgOps | https://imgops.com/#b#`;
             this.init();
         }
 
+        const videoExtensions = new Set(['3gpp', 'm4v', 'mkv', 'mp4', 'ogv', 'webm', 'm3u8']);
+        const audioExtensions = new Set(['flac', 'm4a', 'mp3', 'oga', 'ogg', 'opus', 'wav']);
+
+        function isVideoLink(url) {
+            if (url.indexOf('.video') !== -1 || url.indexOf('video:') === 0)
+                return true;
+
+            url = url.replace(/.gif(\?width=\d*&|\?)format=mp4/, '.mp4?').replace(/\/$/, "");
+            if (url.lastIndexOf('?') > 0)
+                url = url.substring(0, url.lastIndexOf('?'));
+            const ext = url.substring(url.lastIndexOf('.') + 1).toLowerCase();
+
+            return videoExtensions.has(ext)
+            || url.indexOf('googlevideo.com/videoplayback') > 0
+            || url.indexOf('v.redd.it') > 0;
+        }
+
+        function isAudioLink(url) {
+            if (url.indexOf('.audio') !== -1 || url.indexOf('audio:') === 0)
+                return true;
+            url = url.replace(/\/$/, "");
+            if (url.lastIndexOf('?') > 0)
+                url = url.substring(0, url.lastIndexOf('?'));
+            const ext = url.substring(url.lastIndexOf('.') + 1).toLowerCase();
+            return audioExtensions.has(ext);
+        }
+
         MatchedRuleC.prototype={
             init:function(){
-                try{
-                    var customRules=unsafeWindow.eval(prefs.customRules);
-                    if(Array.isArray(customRules)){
-                        customRules.forEach(rule=>{
-                            let hasRule = false;
-                            for(let s in siteInfo){
-                                if(siteInfo[s].name == rule.name){
-                                    hasRule = true;
-                                    for(let si in rule){
-                                        siteInfo[s][si]=rule[si];
-                                    }
-                                    break;
-                                }
-                            }
-                            if(!hasRule)siteInfo.unshift(rule);
-                        })
-                        //siteInfo=customRules.concat(siteInfo);
+                if (prefs.customRules) {
+                    if (prefs.customRules == `[
+/*
+  {
+    name: "Example, can be deleted safely",
+    url: /^https?:\\/\\/www\\.google\\.com\\/search\\?/,
+    getImage: function(a) {},
+    src: /avatar/i,
+    r: /\\?.*$/i,
+    s: ''
+  }
+*/]`) {
+                        prefs.customRules = "[]";
                     }
-                }catch(e){}
+                    try {
+                        var customRules;
+                        if (prefs.customRules.indexOf("name:") !== -1) {
+                            if (!isunsafe()) {
+                                customRules = unsafeWindow.eval(createScript(prefs.customRules));
+                            }
+                        } else {
+                            customRules = JSON.parse(prefs.customRules);
+                        }
+                        if (Array.isArray(customRules)) {
+                            customRules.forEach(rule => {
+                                rule.custom = true;
+                                let hasRule = false;
+                                for (let s = 0; s < siteInfo.length; s++) {
+                                    if (siteInfo[s].name == rule.name) {
+                                        hasRule = true;
+                                        for (let si in rule) {
+                                            siteInfo[s][si] = rule[si];
+                                        }
+                                        break;
+                                    }
+                                }
+                                if (!hasRule) siteInfo.unshift(rule);
+                            })
+                        }
+                    } catch(e) {
+                        console.log("Wrong rule for Picviewer CE+");
+                        console.log(e);
+                    }
+                }
 
-                var self=this,r=0;
+                var self = this, r = 0, urlChecked = false;
                 self.rules=[];
                 function searchByTime(){
                     setTimeout(()=>{
-                        let end=r+10;
+                        let end=r+20;
                         end=end>siteInfo.length?siteInfo.length:end;
                         for(;r<end;r++){
                             let site=siteInfo[r];
-                            if (site.enabled != false && (!site.url || toRE(site.url).test(URL))) {
-                                if(site.url){
-                                    if(site.css){
-                                        var style = document.createElement('style');
-                                        style.type = 'text/css';
+                            if (site.enabled != false && (!site.url || toRE(site.url).test(_URL))) {
+                                if (site.xhr) {
+                                    site.xhr.after = src => {
+                                        let newSrc = self.replaceByRule(src, site, true);
+                                        if (Array.isArray(newSrc)) newSrc = newSrc[0];
+                                        return newSrc && newSrc.length ? newSrc : src;
+                                    };
+                                    let reMatch = typeof site.xhr.url === "string" && site.xhr.url.match(/^\/(.*)\/(\w*)$/);
+                                    if (reMatch) {
+                                        site.xhr.url = toRE(reMatch[1], reMatch[2]);
+                                    } else if (Array.isArray(site.xhr.url)) {
+                                        let urlRe = toRE(site.xhr.url[0], "i");
+                                        let urlParam = site.xhr.url[1];
+                                        site.xhr.url = (a, p) => {
+                                            if (!a || !a.href) return;
+                                            if (urlRe.test(a.href)) {
+                                                return a.href.replace(urlRe, urlParam);;
+                                            }
+                                        };
+                                    }
+                                }
+                                if (site.url && !urlChecked) {
+                                    urlChecked = true;
+                                    if (site.css) {
+                                        var style = _GM_addStyle(site.css);
                                         style.id = 'gm-picviewer-site-style';
-                                        style.textContent = site.css;
-                                        document.head.appendChild(style);
                                     }
-                                    if(site.xhr){
-                                        self.xhr=site.xhr;
+                                    if (site.lazyAttr) {
+                                        self.lazyAttr = site.lazyAttr;
                                     }
-                                    if(site.lazyAttr){
-                                        self.lazyAttr=site.lazyAttr;
+                                    if (site.description) {
+                                        self.description = site.description;
                                     }
-                                    if(site.description){
-                                        self.description=site.description;
+                                    if (site.saveName != null) {
+                                        self.saveName = site.saveName;
                                     }
-                                    if(site.clickToOpen){
-                                        self.clickToOpen=site.clickToOpen;
+                                    if (site.clickToOpen) {
+                                        self.clickToOpen = site.clickToOpen;
                                     }
-                                    if(site.ext){
-                                        self.ext=site.ext;
+                                    if (site.ext) {
+                                        self.ext = site.ext;
+                                    }
+                                    if (site.gallery) {
+                                        let gallery = site.gallery;
+                                        self.gallery = () => {
+                                            if (typeof gallery === "string") {
+                                                return document.querySelectorAll(gallery);
+                                            } else {
+                                                return gallery();
+                                            }
+                                        };
+                                    }
+                                    if (site.video) {
+                                        let reMatch = typeof site.video === "string" && site.video.match(/^\/(.*)\/(\w*)$/);
+                                        if (reMatch) {
+                                            site.video = toRE(reMatch[1], reMatch[2]);
+                                        }
+                                        self.video = site.video;
+                                    }
+                                    if (site.audio) {
+                                        let reMatch = typeof site.audio === "string" && site.audio.match(/^\/(.*)\/(\w*)$/);
+                                        if (reMatch) {
+                                            site.audio = toRE(reMatch[1], reMatch[2]);
+                                        }
+                                        self.audio = site.audio;
+                                    }
+                                    if (site.getExtSrc) {
+                                        self.getExtSrc = site.getExtSrc;
+                                    }
+                                    if (site.mute) {
+                                        self.mute = true;
                                     }
                                 }
                                 self.rules.push(site);
@@ -20581,15 +26060,43 @@ ImgOps | https://imgops.com/#b#`;
                         }
                         if(end<siteInfo.length){
                             searchByTime();
+                        }else{
+                            self.rules.sort((a, b) => {
+                                if (a.custom && !b.custom) return -1;
+                                if (!a.custom && b.custom) return 1;
+                                if (a.url && !b.url) return -1;
+                                if (!a.url && b.url) return 1;
+                                return 0;
+                            });
                         }
-                    },5);
+                    },1);
                 }
-                if(window.self == window.top){
+                setTimeout(() => {
+                    if (unsafeWindow.pvcepRules && Array.isArray(unsafeWindow.pvcepRules)) {
+                        unsafeWindow.pvcepRules.forEach(rule => {
+                            rule.custom = true;
+                            let hasRule = false;
+                            for (let s = 0; s < siteInfo.length; s++) {
+                                if (siteInfo[s].name == rule.name) {
+                                    hasRule = true;
+                                    for (let si in rule) {
+                                        siteInfo[s][si] = rule[si];
+                                    }
+                                    break;
+                                }
+                            }
+                            if (!hasRule) siteInfo.unshift(rule);
+                        })
+                    }
                     searchByTime();
-                }
+                }, 1);
             },
             replace:function(str, r, s){
                 var results=[],rt;
+                let reMatch = typeof r === "string" && r.match(/^\/(.*)\/(\w+)$/);
+                if (reMatch) {
+                    r = toRE(reMatch[1], reMatch[2]);
+                }
                 if(Array.isArray(s)){
                     s.forEach(_s=>{
                         rt=str.replace(r, _s);
@@ -20597,51 +26104,163 @@ ImgOps | https://imgops.com/#b#`;
                     });
                 }else{
                     rt=str.replace(r, s);
-                    if(rt && rt!=str)return str.replace(r, s);
+                    if(rt && rt!=str)return rt;
                 }
                 return results;
             },
-            getImage:function(img, a, p){
-                var newSrc,rule;
-                var base64Img=/^data:/i.test(img.src);
-                for(var i in this.rules){
-                    rule=this.rules[i];
-                    if((!rule.url || !rule.getImage) && base64Img)continue;
-                    if(rule.src && !rule.src.test(img.src))continue;
-                    if(rule.exclude && rule.exclude.test(img.src))continue;
-                    if(rule.getImage){
-                        newSrc = rule.getImage.call(img, a, p);
-                    }else{
-                        if(rule.r){
-                            if(Array.isArray(rule.r)){//r最多一层
-                                for(var j in rule.r){
-                                    var _r=rule.r[j];
-                                    if(_r && _r.test && _r.test(img.src)){
-                                        if(Array.isArray(rule.s)){//s对上r最多两层
-                                            var _s=rule.s[j];
-                                            newSrc=this.replace(img.src, _r, _s);
-                                        }else{
-                                            newSrc=this.replace(img.src, _r, rule.s);
-                                        }
-                                        break;
-                                    }
-                                }
-                            }else{
-                                newSrc=this.replace(img.src, rule.r, rule.s);
+            replaceByRule: function(src, rule, check) {
+                if (check) {
+                    if (!rule.r || /^data:/i.test(src)) return src;
+                }
+                let newSrc;
+                if (Array.isArray(rule.r)) {//r最多一层
+                    for (var j = 0; j < rule.r.length; j++) {
+                        var _r = rule.r[j];
+                        if (_r) {
+                            if (Array.isArray(rule.s)) {//s对上r最多两层
+                                var _s = rule.s[j];
+                                newSrc = this.replace(src, _r, _s);
+                            } else {
+                                newSrc = this.replace(src, _r, rule.s);
+                            }
+                            if (newSrc && newSrc.length && newSrc !== src) {
+                                break;
                             }
                         }
                     }
-                    if(newSrc && newSrc.length>0 && newSrc!=img.src){
-                        debug(rule);
-                        break;
+                } else {
+                    newSrc = this.replace(src, rule.r, rule.s);
+                }
+                return newSrc && newSrc.length ? newSrc : src;
+            },
+            getMode: function(src) {
+                if (!src || !src.length) return "";
+                if (this.video && this.video.test(src)) {
+                    return "video";
+                }
+                if (this.audio && this.audio.test(src)) {
+                    return "audio";
+                }
+                if (isVideoLink(src)) {
+                    return "video";
+                }
+                if (isAudioLink(src)) {
+                    return "audio";
+                }
+                return "";
+            },
+            getXhrLink: function(a, p) {
+                var newSrc, rule;
+                this.xhr = null;
+                this.xhrLink = false;
+                for (var i = 0; i < this.rules.length; i++) {
+                    rule = this.rules[i];
+                    if (rule.src) continue;
+                    if (rule.xhr) {
+                        if (rule.xhr.url) {
+                            if (rule.xhr.url.test) {
+                                if (a && rule.xhr.url.test(a.href)) {
+                                    newSrc = a.href;
+                                }
+                            } else if (typeof rule.xhr.url === 'string') {
+                                try {
+                                    if (a && a.matches(rule.xhr.url)) {
+                                        newSrc = a.href;
+                                    }
+                                } catch(e) {
+                                    debug(e);
+                                }
+                            } else {
+                                newSrc = rule.xhr.url.call(a, a, p, rule.xhr);
+                            }
+                            if (newSrc) {
+                                this.xhrLink = true;
+                                this.xhr = rule.xhr;
+                                return newSrc;
+                            }
+                        } else if (a) {
+                            newSrc = a.href;
+                            if (newSrc) {
+                                this.xhrLink = true;
+                                this.xhr = rule.xhr;
+                                return newSrc;
+                            }
+                        }
                     }
                 }
-                if(newSrc && newSrc.length==0)newSrc=null;
+            },
+            getImage: function(img, a, p, target) {
+                var newSrc, rule;
+                var base64Img = /^data:/i.test(img.src);
+                this.all = null;
+                this.xhr = null;
+                for (var i = 0; i < this.rules.length; i++) {
+                    rule = this.rules[i];
+                    if (rule.src && !toRE(rule.src).test(img.src)) continue;
+                    if (rule.exclude && toRE(rule.exclude).test(img.src)) continue;
+                    if (rule.xhr) {
+                        if (rule.xhr.url) {
+                            if (rule.xhr.url.test) {
+                                if (a && rule.xhr.url.test(a.href)) {
+                                    newSrc = a.href;
+                                }
+                            } else if (typeof rule.xhr.url === 'string') {
+                                try {
+                                    if (a && a.matches(rule.xhr.url)) {
+                                        newSrc = a.href;
+                                    }
+                                } catch(e) {
+                                    debug(e);
+                                }
+                            } else {
+                                newSrc = rule.xhr.url.call(target || img, a, p, rule.xhr);
+                            }
+                            if (newSrc) {
+                                this.xhr = rule.xhr;
+                                return newSrc;
+                            } else {
+                                this.xhr = null;
+                            }
+                        } else if (a) {
+                            newSrc = a.href;
+                        }
+                    }
+                    if (base64Img && (!rule.url || !rule.getImage)) continue;
+                    if (newSrc) {
+                        this.xhr = rule.xhr;
+                        return newSrc;
+                    }
+                    if (rule.getImage) {
+                        newSrc = rule.getImage.call(target || img, a, p, rule);
+                        if (newSrc && newSrc.all) {
+                            this.all = newSrc.all;
+                            newSrc = this.all[0];
+                        }
+                    } else newSrc = null;
+                    if (!base64Img && rule.r && img.src && !Array.isArray(newSrc)) {
+                        if (!newSrc) newSrc = img.src || img.currentSrc;
+                        newSrc = this.replaceByRule(newSrc, rule);
+                    }
+                    if (newSrc && newSrc.length > 0 && newSrc != (img.src || img.currentSrc)) {
+                        debug(rule);
+                        break;
+                    } else newSrc = null;
+                }
+                if (newSrc && newSrc.length == 0) newSrc = null;
                 return newSrc;
             }
         };
 
         var isFrame=window!=window.parent;
+        function isLargeFrame(){
+            try{
+                var topWin = window.top;
+                return window.innerWidth >= topWin.innerWidth * 0.5 &&
+                       window.innerHeight >= topWin.innerHeight * 0.5;
+            }catch(e){
+                return false;
+            }
+        }
         var topWindowValid;
         var frameSentData;
         var frameSentSuccessData;
@@ -20654,6 +26273,10 @@ ImgOps | https://imgops.com/#b#`;
                     command=data.command;
                     switch(command){
                         case 'open':{
+                            if (data.buttonType === 'download') {
+                                downloadImg(data.src, document.title, prefs.saveName, null, data.data);
+                                return;
+                            }
                             var img=document.createElement('img');
                             img.src=data.src;
 
@@ -20678,7 +26301,7 @@ ImgOps | https://imgops.com/#b#`;
                             window.postMessage({
                                 messageID:messageID,
                                 command:'topWindowValid_frame',
-                                valid:document.body.nodeName!='FRAMESET',
+                                valid:getBody(document).nodeName.toUpperCase()!='FRAMESET',
                                 to:data.from,
                             },'*');
                         }break;
@@ -20706,12 +26329,15 @@ ImgOps | https://imgops.com/#b#`;
                                     flashEle(targetImg);
                                 },0);
                             };
-                            window.postMessage({
-                                messageID:messageID,
-                                command:'navigateToImg',
-                                exist:exist,
-                                to:data.from,
-                            },'*');
+                            if (data.from) {
+                                window.postMessage({
+                                    messageID:messageID,
+                                    command:'navigateToImg',
+                                    exist:exist,
+                                    to:data.from,
+                                    index:data.index
+                                },'*');
+                            }
                         }break;
                         case 'sendFail':{
                             frameSentData=frameSentSuccessData;
@@ -20732,19 +26358,19 @@ ImgOps | https://imgops.com/#b#`;
         //通讯逻辑..A页面的contentscript发送到A页面的pagescript，pagescript转交给B页面的contentscript
         var messageID='pv-0.5106795670312598';
 
+        var _isunsafe = null;
         function isunsafe(){
-            try {
-                return eval("false");
-            } catch (e) {
-                return true;
+            if (_isunsafe === null) {
+                try {
+                    _isunsafe = unsafeWindow.eval(createScript("false"));
+                } catch (e) {
+                    console.debug("unsafe");
+                    _isunsafe = true;
+                }
             }
+            return _isunsafe;
         }
         function addPageScript() {
-
-            if(isunsafe())return;
-            var pageScript=document.createElement('script');
-            pageScript.id = 'picviewer-page-script';
-
             var pageScriptText=function(messageID){
                 var frameID=Math.random();
                 var frames={
@@ -20755,7 +26381,7 @@ ImgOps | https://imgops.com/#b#`;
                     var data=e.data;
                     if( !data || !data.messageID || data.messageID != messageID )return;//通信ID认证
                     var source=e.source;
-                    if(source===window){//来自contentscript,发送出去,或者干嘛。
+                    if(source===window || source===unsafeWindow){//来自contentscript,发送出去,或者干嘛。
                         if(data.to){
                             data.from=frameID;
                             frames[data.to].postMessage(data,'*');
@@ -20786,23 +26412,49 @@ ImgOps | https://imgops.com/#b#`;
                 },true)
             };
 
-            pageScript.textContent='(' + pageScriptText.toString() + ')('+ JSON.stringify(messageID) +')';
-            if(document.head)document.head.appendChild(pageScript);
+            try{
+                if(isunsafe()){
+                    pageScriptText(messageID);
+                }else{
+                    var pageScript=document.createElement('script');
+                    pageScript.id = 'picviewer-page-script';
+                    pageScript.textContent=createScript('(' + pageScriptText.toString() + ')('+ JSON.stringify(messageID) +')');
+                    if(document.head)document.head.appendChild(pageScript);
+                }
+            }catch(e){
+                console.debug("addPageScript function failed", e);
+            }
         }
 
         function clickToOpen(data){
             var preventDefault = matchedRule.clickToOpen.preventDefault;
+            var button = matchedRule.clickToOpen.button || 0;
+            var alt = !!matchedRule.clickToOpen.alt;
+            var ctrl = !!matchedRule.clickToOpen.ctrl;
+            var shift = !!matchedRule.clickToOpen.shift;
+            var meta = !!matchedRule.clickToOpen.meta;
 
             function mouseout(){
-                document.removeEventListener('mouseout',mouseout,true);
-                document.removeEventListener('click',click,true);
+                document.removeEventListener('mouseout', mouseout, true);
+                document.removeEventListener(button == 2 ? 'contextmenu' : 'mousedown', click, true);
                 if(data.imgPA && preventDefault){
-                    data.imgPA.removeEventListener('click',clickA,false);
+                    data.imgPA.removeEventListener('click', clickA, true);
                 };
             };
 
+            function checkLimit(e){
+                if(e.button!=button ||
+                   e.altKey!=alt ||
+                   e.ctrlKey!=ctrl ||
+                   e.shiftKey!=shift ||
+                   e.metaKey!=meta){
+                    return false;
+                }
+                return true;
+            }
+
             function click(e){
-                if(e.button!=0)return;
+                if(!checkLimit(e))return;
                 FloatBarC.prototype.open.call({
                     data:data,
                 },e,matchedRule.clickToOpen.type);
@@ -20814,17 +26466,18 @@ ImgOps | https://imgops.com/#b#`;
             };
 
             function clickA(e){//阻止a的默认行为
+                if(!checkLimit(e))return;
                 e.preventDefault();
             };
 
-            document.addEventListener('click',click,true);
+            document.addEventListener(button == 2 ? 'contextmenu' : 'mousedown', click, true);
 
             if(data.imgPA && preventDefault){
-                data.imgPA.addEventListener('click',clickA,false);
+                data.imgPA.addEventListener('click', clickA, true);
             };
 
             setTimeout(function(){//稍微延时。错开由于css hover样式发生的out;
-                document.addEventListener('mouseout',mouseout,true);
+                document.addEventListener('mouseout', mouseout, true);
             },100);
 
             return function(){
@@ -20832,49 +26485,84 @@ ImgOps | https://imgops.com/#b#`;
             };
         }
 
-        var canclePreCTO,uniqueImgWin,centerInterval,removeUniqueWinTimer,globalFuncEnabled=false;
+        var canclePreCTO,uniqueImgWin,centerInterval,globalFuncEnabled=false,isConfigOpen=false;
         function checkGlobalKeydown(e){
-            return(!((!e.ctrlKey && prefs.floatBar.globalkeys.ctrl)||
-                     (!e.altKey && prefs.floatBar.globalkeys.alt)||
-                     (!e.shiftKey && prefs.floatBar.globalkeys.shift)||
-                     (!e.metaKey && prefs.floatBar.globalkeys.command)||
+            return(!((!e.ctrlKey && e.key !== 'Control' && prefs.floatBar.globalkeys.ctrl)||
+                     (!e.altKey && e.key !== 'Alt' && prefs.floatBar.globalkeys.alt)||
+                     (!e.shiftKey && e.key !== 'Shift' && prefs.floatBar.globalkeys.shift)||
+                     (!e.metaKey && e.key !== 'Meta' && prefs.floatBar.globalkeys.command)||
                      (!prefs.floatBar.globalkeys.ctrl && !prefs.floatBar.globalkeys.alt && !prefs.floatBar.globalkeys.shift && !prefs.floatBar.globalkeys.command)));
         }
 
         function checkPreview(e){
+            if (isConfigOpen) return false;
+            let selStr;
+            try {
+                selStr = !selectionClientRect && selectionStr;
+            }catch(e){}
+            if (selStr && selStr != "\n") return false;
             let keyActive=(prefs.floatBar.globalkeys.type == "hold" && checkGlobalKeydown(e)) ||
                 (prefs.floatBar.globalkeys.type == "press" && globalFuncEnabled);
             return prefs.floatBar.globalkeys.invertInitShow?!keyActive:keyActive;
         }
 
-        //监听 mouseover
-        function globalMouseoverHandler(e){
+        var untilMoveTimer, moveHandler, uniqueImgWinInitX, uniqueImgWinInitY;
+        function waitUntilMove(target, callback) {
+            if (moveHandler) document.removeEventListener('mousemove', moveHandler, true);
+            if (untilMoveTimer) clearTimeout(untilMoveTimer);
 
-            if(galleryMode)return;//库模式全屏中......
+            moveHandler = e => {
+                uniqueImgWinInitX = e.clientX;
+                uniqueImgWinInitY = e.clientY;
+                if (target != e.target) {
+                    let preRect = target.getBoundingClientRect();
+                    let nextRect = e.target.getBoundingClientRect();
+                    if (preRect && nextRect && (preRect.left > nextRect.left || preRect.right < nextRect.right || preRect.top > nextRect.top || preRect.bottom < nextRect.bottom)) {
+                        document.removeEventListener('mousemove', moveHandler, true);
+                        clearTimeout(untilMoveTimer);
+                    }
+                }
+            }
+            document.addEventListener('mousemove', moveHandler, true);
+            untilMoveTimer = setTimeout(() => {
+                document.removeEventListener('mousemove', moveHandler, true);
+                callback();
+            }, prefs.floatBar.showDelay || 0)
+        }
 
-            var target = e.target;
-
-            if (!target || target.id=="pv-float-bar-container" ||
-                (target.parentNode && (target.parentNode.id=="icons" || target.parentNode.className=="search-jumper-btn")) ||
+        function checkFloatBar(_target, type, canPreview, clientX, clientY, altKey, composedTarget) {
+            let target = _target;
+            if (!target || target.id == "pv-float-bar-container" ||
+                (target.parentNode && (target.parentNode.id == "icons" || target.parentNode.className == "search-jumper-btn")) ||
                 (target.className &&
                  (/^pv\-/.test(target.className) ||
-                  target.className=="whx-a" ||
-                  target.className=="whx-a-node" ||
-                  target.className=="search-jumper-btn" ||
+                  target.className == "whx-a" ||
+                  target.className == "whx-a-node" ||
+                  target.className == "search-jumper-btn" ||
+                  target.classList.contains("pv-icon") ||
                   target.classList.contains("ks-imagezoom-lens")))) {
                 return;
             }
-            if (target.nodeName=="PICTURE"){
-                target=target.querySelector("img");
+            if (target.nodeName.toUpperCase() == "PICTURE"){
+                target = target.querySelector("img");
             }
-            if(e.type=="mousemove"){
-                if(target.nodeName != 'IMG' || !checkPreview(e) || (uniqueImgWin && !uniqueImgWin.removed)){
+            if (type == "mousemove") {
+                if ((uniqueImgWin && !uniqueImgWin.removed && !uniqueImgWin.previewed)) {
+                    uniqueImgWin.followPos(clientX, clientY);
+                    if (!canPreview) {
+                        uniqueImgWin.remove();
+                    }
+                    return;
+                } else if (target.nodeName.toUpperCase() != 'IMG' || !canPreview) {
                     return;
                 }
             }
 
+            if (target.nodeName.toUpperCase() == 'IMG' && !target.naturalHeight) {
+                target = target.parentNode;
+            }
             // 扩展模式，检查前面一个是否为 img
-            if (target.nodeName != 'IMG' && matchedRule.rules.length>0 && matchedRule.ext) {
+            if (target.nodeName.toUpperCase() != 'IMG' && matchedRule.rules.length > 0 && matchedRule.ext) {
                 var _type = typeof matchedRule.ext;
                 if (_type == 'string') {
                     switch (matchedRule.ext) {
@@ -20891,7 +26579,7 @@ ImgOps | https://imgops.com/#b#`;
                     }
                 } else if (_type == 'function') {
                     try {
-                        target = matchedRule.ext(target);
+                        target = matchedRule.ext(target) || target;
                     } catch(ex) {
                         throwErrorInfo(ex);
                     }
@@ -20899,42 +26587,210 @@ ImgOps | https://imgops.com/#b#`;
                     if (!target) return;
                 }
             }
-            var result, hasBg = node => {
-                if(node.nodeName == "HTML" || node.nodeName == "#document"){
+            let bgReg = /.*url\(\s*["']?([^ad\s'"#].+?)["']?\s*\)([^'"]|$)/i;
+            let bgRegLong = /^\s*url\(\s*["']?([^ad\s'"#].+?)["']?\s*\)([^'"]|$)/i;
+            let result, targetBg, hasBg = node => {
+                if(/^(html|body|#document)$/i.test(node.nodeName) || node.nodeType != 1){
                     return false;
                 }
+                if (node.clientWidth <= prefs.floatBar.minSizeLimit.w || node.clientHeight <= prefs.floatBar.minSizeLimit.h) {
+                    return false;
+                }
+                targetBg = "";
                 let nodeStyle = unsafeWindow.getComputedStyle(node);
-                return node && nodeStyle.backgroundImage && /^\s*url\(\s*['"]?\s*[^a\s]/i.test(nodeStyle.backgroundImage) && parseFloat(nodeStyle.width) > prefs.floatBar.minSizeLimit.w && parseFloat(nodeStyle.height) > prefs.floatBar.minSizeLimit.h;
-            };
-            if (target.nodeName != 'IMG'){
-                if(target.nodeName == "AREA")target=target.parentNode;
-                var targetBg;
-                var bgReg=/^\s*url\(\s*["']?(.+?)["']?\s*\)/i;
-                if(prefs.floatBar.listenBg && hasBg(target)){
-                    targetBg = unsafeWindow.getComputedStyle(target).backgroundImage.replace(bgReg,"$1");
-                    let src=targetBg,nsrc=src,noActual=true,type="scale";
-                    let img={src:src};
-                    result = {
-                        src: nsrc,
-                        type: type,
-                        imgSrc: src,
-                        noActual:noActual,
-                        img: target
-                    };
-                }else if(target.previousElementSibling && target.previousElementSibling.tagName=="IMG"){
-                    if(unsafeWindow.getComputedStyle(target).position=="absolute" || target.nodeName == "MAP"){
-                        target=target.previousElementSibling;
+
+                let bg = nodeStyle.backgroundRepeatX != "repeat" && nodeStyle.backgroundRepeatY != "repeat" && nodeStyle.backgroundImage;
+                if (bg && bg !== "none") {
+                    targetBg = nodeStyle.backgroundImage.match(bg.length > 500 ? bgRegLong : bgReg);
+                }
+                if (!targetBg) {
+                    nodeStyle = unsafeWindow.getComputedStyle(node, "::before");
+                    bg = nodeStyle.backgroundRepeatX != "repeat" && nodeStyle.backgroundRepeatY != "repeat" && nodeStyle.backgroundImage;
+                    if (bg && bg !== "none") {
+                        targetBg = nodeStyle.backgroundImage.match(bg.length > 500 ? bgRegLong : bgReg);
                     }
-                }else if(target.childNodes.length<=2 && target.querySelectorAll("img").length==1){
-                    target=target.querySelector("img");
-                }else if(target.parentNode){
-                    if(target.parentNode.nodeName=='IMG'){
-                        target=target.parentNode;
-                    }else if(prefs.floatBar.listenBg && hasBg(target.parentNode)){
-                        target=target.parentNode;
-                        targetBg=unsafeWindow.getComputedStyle(target).backgroundImage.replace(bgReg,"$1");
-                        let src=targetBg,nsrc=src,noActual=true,type="scale";
-                        let img={src:src};
+                }
+                if (!targetBg) {
+                    nodeStyle = unsafeWindow.getComputedStyle(node, "::after");
+                    bg = nodeStyle.backgroundRepeatX != "repeat" && nodeStyle.backgroundRepeatY != "repeat" && nodeStyle.backgroundImage;
+                    if (bg && bg !== "none") {
+                        targetBg = nodeStyle.backgroundImage.match(bg.length > 500 ? bgRegLong : bgReg);
+                    }
+                }
+                if (targetBg) {
+                    targetBg = targetBg[1].replace(/\\"/g, '"');
+                }
+                return targetBg;
+            };
+            if (target.nodeName.toUpperCase() != 'IMG') {
+                let nsrc, imgPN, imgPA, imgPE = [];
+                try {
+                    if (matchedRule.getExtSrc) {
+                        nsrc = matchedRule.getExtSrc.call(target);
+                    }
+                    if (!nsrc && target.href) {
+                        imgPN = target;
+                        let i = 0;
+                        while (imgPN = imgPN.parentNode || imgPN.host) {
+                            if (i++ > 5 || imgPN.nodeName.toUpperCase() == 'BODY') {
+                                break;
+                            } else {
+                                imgPE.push(imgPN);
+                            }
+                        }
+                        nsrc = matchedRule.getXhrLink(target, imgPE);
+                    }
+                } catch(ex) {
+                    throwErrorInfo(ex);
+                }
+                if (nsrc) {
+                    let all;
+                    if (nsrc && nsrc.all) {
+                        all = nsrc.all;
+                        nsrc = all[0];
+                    }
+                    let src = nsrc, imgSrc = prefs.floatBar.listenBg && hasBg(target) ? targetBg : nsrc;
+                    if (Array.isArray(nsrc) && nsrc.length == 2) {
+                        imgSrc = nsrc[0];
+                        src = nsrc[1];
+                    }
+                    if (!matchedRule.xhrLink) {
+                        imgPN = target;
+                        imgPE = [];
+                        do {
+                            if (imgPN.nodeName.toUpperCase() == 'A') {
+                                imgPA = imgPN;
+                                break;
+                            }
+                        } while (imgPN = imgPN.parentNode || imgPN.host);
+                        imgPN = target;
+                        while (imgPN = imgPN.parentNode || imgPN.host) {
+                            if (imgPN.nodeName.toUpperCase() == 'BODY') {
+                                break;
+                            } else {
+                                imgPE.push(imgPN);
+                            }
+                        }
+                        src = matchedRule.getImage(target, imgPA, imgPE) || src;
+                    }
+                    let noActual = src === imgSrc;
+                    result = {
+                        all: all || matchedRule.all,
+                        src: src,
+                        type: matchedRule.xhrLink && noActual ? "link" : "rule",
+                        imgSrc: imgSrc,
+                        noActual: noActual,
+                        img: target,
+                        xhr: matchedRule.xhr
+                    };
+                }
+            }
+            var checkUniqueImgWin = function() {
+                let invert = !canPreview && prefs.floatBar.globalkeys.invertInitShow && prefs.floatBar.globalkeys.type == "hold";
+                if (canPreview || invert) {
+                    let forceShow = (() => {
+                        if (result.type != "link" && result.type != "rule" && result.src == result.imgSrc) {
+                            if (result.imgAS.w < result.imgCS.w * 1.3 && result.imgAS.h < result.imgCS.h * 1.3) {
+                                if (result.img && result.img.childElementCount) {
+                                    if (result.type == "force") return false;
+                                    if (prefs.floatBar.globalkeys.invertInitShow) return false;
+                                }
+                                var wSize = getWindowSize();
+                                if (prefs.floatBar.globalkeys.invertInitShow && result.imgAS.w <= wSize.w && result.imgAS.h <= wSize.h) return false;
+                            }
+                        }
+                        return true;
+                    })();
+                    if (forceShow) {
+                        if (invert) return false;
+                    } else {
+                        if (!invert) return false;
+                    }
+                    uniqueImgWinInitX = clientX;
+                    uniqueImgWinInitY = clientY;
+                    if (uniqueImgWin && !uniqueImgWin.removed) {
+                        if (uniqueImgWin.src == result.src) return true;
+                        uniqueImgWin.remove();
+                    }
+                    waitUntilMove(_target, () => {
+                        new LoadingAnimC(result, 'popup', prefs.waitImgLoad, prefs.framesPicOpenInTopWindow);
+                    });
+                    return true;
+                } else {
+                    return false;
+                }
+            };
+            if (!result) {
+                if (target.nodeName.toUpperCase() != 'IMG' && target.dataset.role == "img") {
+                    let img = target.parentNode.querySelector('img');
+                    if (img) target = img;
+                }
+                if (target.nodeName.toUpperCase() == 'IMAGE') {
+                    let src = target.href && target.href.baseVal;
+                    if (src) {
+                        result = {
+                            src: src,
+                            type: "rule",
+                            imgSrc: src,
+                            noActual: true,
+                            img: target.parentNode
+                        };
+                    }
+                } else if (target.nodeName.toUpperCase() != 'IMG') {
+                    if (selectionClientRect &&
+                        clientX > selectionClientRect.left &&
+                        clientX < selectionClientRect.left + selectionClientRect.width &&
+                        clientY > selectionClientRect.top &&
+                        clientY < selectionClientRect.top + selectionClientRect.height) {
+                        result = {
+                            src: selectionStr,
+                            type: "link",
+                            imgSrc: selectionStr,
+                            noActual:true,
+                            img: target
+                        };
+                        checkUniqueImgWin();
+
+                        if (!floatBar) {
+                            floatBar = new FloatBarC();
+                        }
+                        floatBar.start(result);
+
+                        return;
+                    }
+                    if (composedTarget && composedTarget.naturalHeight) target = composedTarget;
+                    let found = false;
+                    if (target.nodeName.toUpperCase() == "AREA") target = target.parentNode;
+                    var broEle, broImg;
+                    if (target.parentNode && target.parentNode.style && !/flex|grid|table/.test(getComputedStyle(target.parentNode).display)) {
+                        broEle = target.previousElementSibling;
+                        while (broEle) {
+                            if (broEle.offsetWidth && broEle.offsetWidth > target.offsetWidth>>1) {
+                                if (broEle.nodeName == "IMG") broImg = broEle;
+                                else if (broEle.nodeName == "PICTURE") broImg = broEle.querySelector("img");
+                            }
+                            if (broEle.offsetWidth && broEle.offsetHeight && getComputedStyle(broEle).position !== "absolute") break;
+                            broEle = broEle.previousElementSibling;
+                        }
+                        if (broEle == target) broEle = null;
+                        else if (!broEle) {
+                            broEle = target.nextElementSibling;
+                            while (broEle) {
+                                if (broEle.offsetWidth && broEle.offsetWidth > target.offsetWidth>>1) {
+                                    if (broEle.nodeName == "IMG") broImg = broEle;
+                                    else if (broEle.nodeName == "PICTURE") broImg = broEle.querySelector("img");
+                                }
+                                if (getComputedStyle(broEle).position == "absolute") break;
+                                broEle = broEle.nextElementSibling;
+                            }
+                            if (broEle == target) broEle = null;
+                        }
+                    }
+                    if (target.children.length == 1 && !(target.textContent && target.textContent.trim()) && target.children[0].naturalHeight) {
+                        target = target.children[0];
+                        found = true;
+                    } else if (prefs.floatBar.listenBg && hasBg(target)) {
+                        let src = targetBg, nsrc = src, noActual = true, type = "scale";
                         result = {
                             src: nsrc,
                             type: type,
@@ -20942,190 +26798,571 @@ ImgOps | https://imgops.com/#b#`;
                             noActual:noActual,
                             img: target
                         };
-                    }/*else if(unsafeWindow.getComputedStyle(target).position=="absolute" || target.nodeName == "MAP"){
-                        var imgChildren=[],availableImgs = [];
-                        [].forEach.call(target.parentNode.querySelectorAll('img'),function(img){
-                            var imgStyle=unsafeWindow.getComputedStyle(img);
-                            if(imgStyle.display != "none"){
-                                imgChildren.push(img);
-                                if(imgStyle.width > 200 || imgStyle.position != "absolute"){
-                                    availableImgs.push(img);
-                                }
-                            }
-                        });
-                        if(imgChildren.length == 1){
-                            target=imgChildren[0];
-                        }else if(availableImgs.length == 1){
-                            target=availableImgs[0];
-                        }else if(imgChildren.length == 0 && unsafeWindow.getComputedStyle(target.parentNode).position=="absolute"){
-                            imgChildren=[];availableImgs = [];
-                            [].forEach.call(target.parentNode.parentNode.querySelectorAll('img'),function(img){
-                                var imgStyle=unsafeWindow.getComputedStyle(img);
-                                if(imgStyle.display != "none"){
-                                    imgChildren.push(img);
-                                    if(imgStyle.width > 200 || imgStyle.position != "absolute"){
-                                        availableImgs.push(img);
-                                    }
-                                }
-                            });
-                            if(imgChildren.length == 1){
-                                target=imgChildren[0];
-                            }else if(availableImgs.length == 1){
-                                target=availableImgs[0];
+                        found = true;
+                    } else if (broImg) {
+                        target = broImg;
+                        found = true;
+                    } else if (target.nodeName.toUpperCase() == 'CANVAS') {
+                        let src = target.src || target.dataset.src;
+                        if (src) {
+                            let nsrc = src, noActual = true, type = "scale";
+                            result = {
+                                src: nsrc,
+                                type: type,
+                                imgSrc: src,
+                                noActual:noActual,
+                                img: target
+                            };
+                            found = true;
+                        }
+                    } else if (prefs.floatBar.listenBg && broEle && hasBg(broEle)) {
+                        let src = targetBg, nsrc = src, noActual = true, type = "scale";
+                        result = {
+                            src: nsrc,
+                            type: type,
+                            imgSrc: src,
+                            noActual:noActual,
+                            img: target
+                        };
+                        found = true;
+                    } else if (target.parentNode) {
+                        let imgs;
+                        if (target.nodeName == 'A') {
+                            imgs = target.querySelectorAll('img');
+                        }
+                        if (imgs && imgs.length == 1) {
+                            target = imgs[0];
+                            found = true;
+                        } else if (target.parentNode.nodeName.toUpperCase() == 'IMG') {
+                            target = target.parentNode;
+                            found = true;
+                        }
+                    }
+                    if (!found) {
+                        let checkEle = target;
+                        while(checkEle && !(checkEle.textContent && checkEle.textContent.trim()) && checkEle.children.length === 1) {
+                            checkEle = checkEle.children[0];
+                            if (target.clientWidth && target.clientWidth > checkEle.clientWidth * 1.2) break;
+                            if (checkEle.nodeName === "IMG") {
+                                target = checkEle;
+                                found = true;
+                                break;
+                            } else if (checkEle.nodeName === "PICTURE") {
+                                target = checkEle.querySelector("img");
+                                found = true;
+                                break;
+                            } else if (prefs.floatBar.listenBg && hasBg(checkEle)) {
+                                let src = targetBg, nsrc = src, noActual = true, type = "scale";
+                                result = {
+                                    src: nsrc,
+                                    type: type,
+                                    imgSrc: src,
+                                    noActual:noActual,
+                                    img: checkEle
+                                };
+                                found = true;
+                                break;
                             }
                         }
-                    }*/
-                }
-                if(result && !/^data:/i.test(result.src)){
-                    if(matchedRule.rules.length>0 && target.nodeName != 'IMG'){
-                        let src=result.src,img={src:src},type,imgSrc=src;
-                        try{
-                            var newSrc=matchedRule.getImage(img);
-                            if(newSrc && imgSrc!=newSrc) {
-                                let srcs, description;
-                                src=newSrc;
-                                if (Array.isArray(src)) {
-                                    srcs = src;
-                                    src = srcs.shift();
-                                }
-                                type = 'rule';
+                    }
+                    if (!found && target.children && target.children.length) {
+                        let img = target.querySelector("img");
+                        if (img) {
+                            while (img.nextElementSibling && img.nextElementSibling.nodeName.toUpperCase() == 'IMG') {
+                                img = img.nextElementSibling;
+                            }
+                            let rect = img.getBoundingClientRect();
 
-                                if (matchedRule.description) {
-                                    var node = getElementMix(matchedRule.description, img);
-                                    if (node) {
-                                        description = node.getAttribute('title') || node.textContent;
+                            if (clientY >= rect.top && clientY <= rect.bottom && clientX >= rect.left  &&  clientX <= rect.right) {
+                                target = img;
+                                found = true;
+                            }
+                        }
+                    }
+                    if (!found && document.elementsFromPoint) {
+                        let elements = document.elementsFromPoint(clientX, clientY);
+                        let checkLen = Math.min(elements.length, 10);
+                        for (let i = 0; i < checkLen; i++) {
+                            let ele = elements[i];
+                            if (!ele) continue;
+                            if (/^img$/i.test(ele.nodeName)) {
+                                target = ele;
+                                result = null;
+                                found = true;
+                                break;
+                            } else if (prefs.floatBar.listenBg && hasBg(ele)) {
+                                target = ele;
+                                let src = targetBg, nsrc = src, noActual = true, type = "scale";
+                                result = {
+                                    src: nsrc,
+                                    type: type,
+                                    imgSrc: src,
+                                    noActual:noActual,
+                                    img: target
+                                };
+                                found = true;
+                                break;
+                            } else if (target.nodeName.toUpperCase() != 'A' && ele.nodeName.toUpperCase() == 'CANVAS') {
+                                let src = ele.src || ele.dataset.src;
+                                if (src) {
+                                    target = ele;
+                                    let nsrc = src, noActual = true, type = "scale";
+                                    result = {
+                                        src: nsrc,
+                                        type: type,
+                                        imgSrc: src,
+                                        noActual:noActual,
+                                        img: target
+                                    };
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!found && target.shadowRoot) {
+                        let imgs = target.shadowRoot.querySelectorAll('img');
+                        if (imgs.length === 1) target = imgs[0];
+                    }
+                    if (!found && prefs.floatBar.listenBg && hasBg(target.parentNode)) {
+                        target = target.parentNode;
+                        let src = targetBg, nsrc = src, noActual = true, type = "scale";
+                        result = {
+                            src: nsrc,
+                            type: type,
+                            imgSrc: src,
+                            noActual:noActual,
+                            img: target
+                        };
+                        found = true;
+                    }
+                    if (result && !/^data:/i.test(result.src)) {
+                        if (matchedRule.rules.length > 0 && target.nodeName.toUpperCase() != 'IMG') {
+                            let src = result.src, img = {src: src}, type, imgSrc = src;
+                            try {
+                                let imgPN=target;
+                                let imgPA,imgPE=[];
+                                while(imgPN=imgPN.parentNode || imgPN.host){
+                                    if(imgPN.nodeName.toUpperCase()=='A'){
+                                        imgPA=imgPN;
+                                        break;
                                     }
                                 }
-                                result.src=src;
-                                result.type=type;
-                                result.noActual=false;
-                                result.xhr=matchedRule.xhr;
-                                result.description=description || '';
-                            }
-                        }catch(err){}
-                        if(result.type!="rule"){
-                            tprules._find(function(rule,index,array){
-                                try{
-                                    src=rule.call(img);
-                                    if(src){
-                                        return true;
-                                    };
-                                }catch(err){
+                                imgPN=target;
+                                while(imgPN=imgPN.parentNode || imgPN.host){
+                                    if(imgPN.nodeName.toUpperCase()=='BODY'){
+                                        break;
+                                    }else{
+                                        imgPE.push(imgPN);
+                                    }
                                 }
-                            });
-                            if(src && src != imgSrc){
-                                result.src=src;
-                                result.type="tpRule";
-                                result.noActual=false;
+                                let newSrc = matchedRule.getImage(img, imgPA, imgPE, target);
+                                if (newSrc && imgSrc != newSrc) {
+                                    let srcs, description;
+                                    src = newSrc;
+                                    if (Array.isArray(src)) {
+                                        srcs = src;
+                                        src = srcs.shift();
+                                    }
+                                    type = 'rule';
+
+                                    if (matchedRule.description) {
+                                        let desc = matchedRule.description, attr;
+                                        if (Array.isArray(desc) && desc.length === 2) {
+                                            attr = desc[1];
+                                            desc = desc[0];
+                                        }
+                                        var node = getElementMix(desc, img);
+                                        if (node) {
+                                            description = attr ? node.getAttribute(attr) : (node.getAttribute('title') || node.textContent);
+                                        }
+                                    }
+                                    result.all = matchedRule.all;
+                                    result.src = src;
+                                    result.type = type;
+                                    result.noActual = false;
+                                    result.xhr = matchedRule.xhr;
+                                    result.description = description || '';
+                                }
+                            } catch(err) {}
+                            if (result.type != "rule") {
+                                tprules.find(function(rule, index, array) {
+                                    try {
+                                        src = rule.call(img);
+                                        if (src) {
+                                            return true;
+                                        };
+                                    } catch(err) {
+                                    }
+                                });
+                                if (src && src != imgSrc) {
+                                    result.src = src;
+                                    result.type = "tpRule";
+                                    result.noActual = false;
+                                }
                             }
                         }
                     }
                 }
             }
-            var checkUniqueImgWin=function(){
-                //metaKey altKey shiftKey ctrlKey
-                if(checkPreview(e)){
-                    if(removeUniqueWinTimer)clearTimeout(removeUniqueWinTimer);
-                    if(uniqueImgWin && !uniqueImgWin.removed) uniqueImgWin.remove();
-                    new LoadingAnimC(result, 'popup', prefs.waitImgLoad, prefs.framesPicOpenInTopWindow);
-                    return true;
-                }else {
-                    if(uniqueImgWin && uniqueImgWin.imgWindow && !uniqueImgWin.removed){
-                        uniqueImgWin.imgWindow.style.pointerEvents = "auto";
-                    }
-                    return false;
-                }
-            };
 
-            if (!result && target.nodeName != 'IMG') {
-                if(target.nodeName == 'A' && /\.(jpg|png|jpeg|gif|webp)\b/.test(target.href)){
+            if (!result && target.nodeName.toUpperCase() != 'IMG') {
+                let i = 0;
+                while(target) {
+                    if (i++ > 5) {
+                        target = null;
+                        break;
+                    }
+                    if ((target.nodeName == 'A' || target.nodeName == 'a') && imageReg.test(target.href)) {
+                        break;
+                    }
+                    target = target.parentNode;
+                }
+                if (target) {
+                    let src = target.href;
+                    if (/[&\?]url\=/.test(src)) {
+                        src = src.replace(/.*[&\?]url\=(.*?)(&.*|$)/, "$1");
+                        try {
+                            src = decodeURIComponent(src);
+                        } catch (e) {}
+                    } else if (/[&\?]https?:/.test(src)) {
+                        src = src.replace(/.*[&\?](https?:)/, "$1");
+                        try {
+                            src = decodeURIComponent(src);
+                        } catch (e) {}
+                    }
                     result = {
-                        src: target.href,
-                        type: "",
-                        imgSrc: target.href,
+                        src: src,
+                        type: "link",
+                        imgSrc: src,
                         noActual:true,
-                        img: target
+                        img: target,
+                        description: target.title || target.innerText
                     };
                     checkUniqueImgWin();
-                }else if(target.parentNode.nodeName == 'A' && /\.(jpg|png|jpeg|gif|webp)\b/.test(target.parentNode.href)){
-                    result = {
-                        src: target.parentNode.href,
-                        type: "",
-                        imgSrc: target.parentNode.href,
-                        noActual:true,
-                        img: target.parentNode
-                    };
-                    checkUniqueImgWin();
+
+                    if (!floatBar) {
+                        floatBar = new FloatBarC();
+                    }
+                    floatBar.start(result);
                 }
                 return;
             }
 
+            let sizeHide = false;
             if (!result) {
                 pretreatment(target)
                 result = findPic(target);
-                if(!result)return;
-                if(!(result.imgAS.w==result.imgCS.w && result.imgAS.h==result.imgCS.h)){//如果不是两者完全相等,那么被缩放了.
-                    if(prefs.floatBar.sizeLimitOr){
-                        if(result.imgCS.h <= prefs.floatBar.minSizeLimit.h && result.imgCS.w <= prefs.floatBar.minSizeLimit.w){//最小限定判断.
-                            return;
+                if (!result) return;
+            }
+
+            if (result) {
+                if (!result.imgAS && !result.imgCS) {
+                    let sizeInfo = {
+                        w: result.img.offsetWidth || result.img.scrollWidth || target.offsetWidth || target.scrollWidth,
+                        h: result.img.offsetHeight || result.img.scrollHeight || target.offsetHeight || target.scrollHeight
+                    }
+                    result.imgAS = sizeInfo;
+                    result.imgCS = sizeInfo;
+                }
+                if (prefs.floatBar.showWithRules && (result.type == "rule" || result.type == "tpRule")) {
+                } else if (!(result.imgAS.w == result.imgCS.w && result.imgAS.h == result.imgCS.h)) {//如果不是两者完全相等,那么被缩放了.
+                    if (prefs.floatBar.sizeLimitOr) {
+                        if (result.imgCS.h <= prefs.floatBar.minSizeLimit.h && result.imgCS.w <= prefs.floatBar.minSizeLimit.w) {//最小限定判断.
+                            sizeHide = true;
                         }
                     }else{
-                        if(result.imgCS.h <= prefs.floatBar.minSizeLimit.h || result.imgCS.w <= prefs.floatBar.minSizeLimit.w){//最小限定判断.
-                            return;
+                        if (result.imgCS.h <= prefs.floatBar.minSizeLimit.h || result.imgCS.w <= prefs.floatBar.minSizeLimit.w) {//最小限定判断.
+                            sizeHide = true;
                         }
                     }
-                }else{
-                    if(prefs.floatBar.sizeLimitOr){
-                        if(result.imgCS.w <= prefs.floatBar.forceShow.size.w && result.imgCS.h <= prefs.floatBar.forceShow.size.h){
-                            return;
+                } else {
+                    if (prefs.floatBar.sizeLimitOr) {
+                        if (result.imgCS.w <= prefs.floatBar.forceShow.size.w && result.imgCS.h <= prefs.floatBar.forceShow.size.h) {
+                            sizeHide = true;
                         }
-                    }else{
-                        if(result.imgCS.w <= prefs.floatBar.forceShow.size.w || result.imgCS.h <= prefs.floatBar.forceShow.size.h){
-                            return;
+                    } else {
+                        if (result.imgCS.w <= prefs.floatBar.forceShow.size.w || result.imgCS.h <= prefs.floatBar.forceShow.size.h) {
+                            sizeHide = true;
                         }
                     }
                 }
-            }
-
-            if(result){
                 debug(result);
-                if(!result.noActual){
-                    if(!result.srcs){
-                        result.srcs=[result.imgSrc];
-                    }else{
-                        if(result.imgSrc && result.srcs.join(" ").indexOf(result.imgSrc)==-1){
+                if (!result.noActual) {
+                    if (!result.srcs) {
+                        result.srcs = [result.imgSrc];
+                    } else {
+                        if (result.imgSrc && result.srcs.join(" ").indexOf(result.imgSrc) == -1) {
                             result.srcs.push(result.imgSrc);
                         }
                     }
                 }
-                if(!floatBar){
-                    floatBar=new FloatBarC();
+                if (!floatBar) {
+                    floatBar = new FloatBarC();
                 }
-                if(result.type=='rule' && matchedRule.clickToOpen && matchedRule.clickToOpen.enabled){
-                    if(canclePreCTO){//取消上次的，防止一次点击打开多张图片
+                if (result.type == 'rule' && matchedRule.clickToOpen && matchedRule.clickToOpen.enabled) {
+                    if (canclePreCTO) {//取消上次的，防止一次点击打开多张图片
                         canclePreCTO();
                     }
-                    canclePreCTO=clickToOpen(result);
+                    canclePreCTO = clickToOpen(result);
                 }
 
-                if(!checkUniqueImgWin()){
-                    let canShow=floatBar.start(result);
-                    if(canShow){
-                        var keyHide=prefs.floatBar.position=="hide"?!e.altKey:e.altKey;
-                        if(keyHide){
-                            floatBar.floatBar.style.opacity=0;
-                            floatBar.floatBar.style.display="none";
-                        }else{
-                            floatBar.floatBar.style.opacity="";
-                            floatBar.floatBar.style.display="initial";
-                        }
+                let hide = sizeHide || (prefs.floatBar.position == "hide" ? true : altKey);
+                result.hide = hide;
+                let canShow = floatBar.start(result);
+                if (!checkUniqueImgWin() && canShow) {
+                    if (floatBar.floatBar.style.opacity == 0) {
+                        floatBar.floatBar.style.opacity = "";
                     }
+                    floatBar.floatBar.style.display = "initial";
                 }
+            }
+        }
+
+        var checkFloatBarTimer, initMouse = false, composedTarget, checking = false, target, type, clientX, clientY, altKey;
+        function globalMouseoverHandler(e) {
+            if (floatBar && floatBar.ignoreEvents) return;
+            if (galleryMode) return;//库模式全屏中......
+            if (e.target == ImgWindowC.overlayer) return;
+            let canPreview = checkPreview(e);
+            if (e.type == "mousemove") {
+                if (!initMouse) {
+                    initMouse = true;
+                    return;
+                }
+                if ((uniqueImgWin && !uniqueImgWin.removed && !uniqueImgWin.previewed)) {
+                    if (canPreview || prefs.floatBar.globalkeys.invertInitShow) {
+                        uniqueImgWinInitX = e.clientX;
+                        uniqueImgWinInitY = e.clientY;
+                        uniqueImgWin.followPos(uniqueImgWinInitX, uniqueImgWinInitY);
+                    } else {
+                        uniqueImgWin.remove();
+                    }
+                    return;
+                } else {
+                    if (checking) {
+                        setTimeout(() => {
+                            checking = false;
+                        }, 50);
+                        return;
+                    }
+                    checking = true;
+                    if (!canPreview) return;
+                    let target = e.target;
+                    if (target.nodeName == "PICTURE"){
+                        target = target.lastElementChild || target;
+                    }
+                    if (target.nodeName != 'IMG') return;
+                }
+            }
+            if (!initMouse) return;
+            if (e.type == "keydown") {
+                if (!target) return;
+            } else {
+                target = e.target;
+                type = e.type;
+                clientX = e.clientX;
+                clientY = e.clientY;
+                altKey = e.altKey;
+                if (e.type !== "mousemove") {
+                    let path = e && e.composedPath && e.composedPath();
+                    composedTarget = path && path[0];
+                }
+            }
+            clearTimeout(checkFloatBarTimer);
+            checkFloatBarTimer = setTimeout(function() {
+                if (!target || !target.parentNode) return;
+                if (gallery && gallery.shown) return;
+                checkFloatBar(target, type, canPreview, clientX, clientY, altKey, composedTarget);
+            }, 50);
+            if (e.target.shadowRoot) {
+                if (!e.target.shadowRoot.initListener) {
+                    e.target.shadowRoot.initListener = true;
+                    e.target.shadowRoot.addEventListener('mouseenter', (e) => {
+                        globalMouseoverHandler(e);
+                    }, true);
+                    e.target.shadowRoot.addEventListener('mousemove', globalMouseoverHandler, true);
+                }
+            }
+        }
+
+        var selectionClientRect, selectionStr, selectionChanging = false;
+        document.addEventListener('selectionchange', e => {
+            if (selectionChanging) return;
+            selectionChanging = true;
+            setTimeout(() => {
+                selectionChanging = false;
+                const selection = window.getSelection();
+                selectionStr = selection.toString();
+                if (selectionStr && selectionStr.length < 500) selectionStr = selectionStr.trim().replace(/^t?t?p?s?:/, "https:");
+                else selectionStr = '';
+                if (selectionStr && imageReg.test(selectionStr)) {
+                    const range = selection.getRangeAt(0);
+                    selectionClientRect = range.getBoundingClientRect();
+                } else {
+                    selectionClientRect = null;
+                }
+            }, 300);
+        });
+
+        document.addEventListener('visibilitychange', e => {
+            initMouse = false;
+        });
+
+        var curLoadingMedia;
+        document.addEventListener('securitypolicyviolation', (e) => {
+            if (!e.violatedDirective.includes('media-src')) {
+                return;
+            }
+            if (curLoadingMedia && curLoadingMedia.src == e.blockedURI) {
+                _GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: curLoadingMedia.src,
+                    responseType: 'blob',
+                    onload: function(response) {
+                        const blobUrl = URL.createObjectURL(response.response);
+
+                        curLoadingMedia.src = blobUrl;
+                        curLoadingMedia.load();
+                        curLoadingMedia.play().catch(err => console.warn('[CSP Fixer] Autoplay after fix was blocked.', err));
+
+                        const releaseBlob = () => URL.revokeObjectURL(blobUrl);
+                        curLoadingMedia.addEventListener('ended', releaseBlob);
+                        window.addEventListener('beforeunload', releaseBlob);
+                    }
+                });
+            }
+        });
+        function createVideo() {
+            let media = document.createElement('video');
+            media.addEventListener('error', e => {
+                if (/^blob:/.test(media.src)) return;
+                _GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: media.src,
+                    responseType: 'blob',
+                    onload: function(response) {
+                        const blobUrl = URL.createObjectURL(response.response);
+
+                        media.src = blobUrl;
+                        media.load();
+                        media.play().catch(err => console.warn('[CSP Fixer] Autoplay after fix was blocked.', err));
+
+                        const releaseBlob = () => URL.revokeObjectURL(blobUrl);
+                        media.addEventListener('ended', releaseBlob);
+                        window.addEventListener('beforeunload', releaseBlob);
+                        curLoadingMedia = null;
+                    }
+                });
+            });
+            return media;
+        }
+
+        async function input(sel, v) {
+            await new Promise((resolve) => {
+                let checkInv = setInterval(() => {
+                    let input = document.querySelector(sel);
+                    if (input) {
+                        input.focus();
+                        input.scrollIntoView();
+                        let lastValue = input.value;
+                        if (input.nodeName == "INPUT") {
+                            var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                            nativeInputValueSetter.call(input, v);
+                        } else {
+                            var nativeTextareaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                            nativeTextareaValueSetter.call(input, v);
+                        }
+                        let event = new Event('focus', { bubbles: true });
+                        input.dispatchEvent(event);
+                        event = new Event('input', { bubbles: true });
+                        let tracker = input._valueTracker;
+                        if (tracker) {
+                            tracker.setValue(lastValue);
+                        }
+                        input.dispatchEvent(event);
+                        event = new Event('change', { bubbles: true });
+                        input.dispatchEvent(event);
+                        clearInterval(checkInv);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+
+        function emuClick(btn){
+            if(!PointerEvent)return btn.click();
+            let eventParam={
+                isTrusted: true,
+                altKey: false,
+                azimuthAngle: 0,
+                bubbles: true,
+                button: 0,
+                buttons: 0,
+                clientX: 1,
+                clientY: 1,
+                cancelBubble: false,
+                cancelable: true,
+                composed: true,
+                ctrlKey: false,
+                defaultPrevented: false,
+                detail: 1,
+                eventPhase: 2,
+                fromElement: null,
+                height: 1,
+                isPrimary: false,
+                metaKey: false,
+                pointerId: 1,
+                pointerType: "mouse",
+                pressure: 0,
+                relatedTarget: null,
+                returnValue: true,
+                shiftKey: false,
+                toElement: null,
+                twist: 0,
+                which: 1
             };
+            btn.focus();
+            var mouseclick = new PointerEvent("mouseover",eventParam);
+            btn.dispatchEvent(mouseclick);
+            mouseclick = new PointerEvent("pointerover",eventParam);
+            btn.dispatchEvent(mouseclick);
+            mouseclick = new PointerEvent("mousedown",eventParam);
+            btn.dispatchEvent(mouseclick);
+            mouseclick = new PointerEvent("pointerdown",eventParam);
+            btn.dispatchEvent(mouseclick);
+            mouseclick = new PointerEvent("mouseup",eventParam);
+            btn.dispatchEvent(mouseclick);
+            mouseclick = new PointerEvent("pointerup",eventParam);
+            btn.dispatchEvent(mouseclick);
+            btn.click();
+        }
+
+        async function clickEle(sel, failAction) {
+            await new Promise((resolve) => {
+                let checkInv = setInterval(() => {
+                    let ele = document.querySelector(sel);
+                    if (ele) {
+                        clearInterval(checkInv);
+                        emuClick(ele);
+                        resolve();
+                    }else if(failAction) {
+                        failAction();
+                    }
+                }, 100);
+            });
+        }
+
+        async function sleep(time) {
+            await new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve();
+                }, time);
+            })
         }
 
         function isKeyDownEffectiveTarget(target) {
-            var localName = target.localName;
+            var localName = (target.shadowRoot ? (target.shadowRoot.activeElement || target) : target).localName;
 
             // 确保光标不是定位在文字输入框或选择框
             if (localName == 'textarea' || localName == 'input' || localName == 'select'){
@@ -21145,68 +27382,219 @@ ImgOps | https://imgops.com/#b#`;
             return true;
         }
 
-        function openGallery(){
+        async function openGallery(){
             if(!gallery){
                 gallery=new GalleryC();
                 gallery.data=[];
             }
-            var allData=gallery.getAllValidImgs();
-            if(allData.length<1)return true;
+            var allData=await gallery.getAllValidImgs();
+            if(allData.length<1)return;
             gallery.data=allData;
             gallery.load(gallery.data);
             return gallery;
         }
 
+        function getActiveElement(root) {
+            const activeEl = root.activeElement;
+            if (!activeEl) {
+                return null;
+            }
+            if (activeEl.shadowRoot) {
+                return getActiveElement(activeEl.shadowRoot);
+            } else {
+                return activeEl;
+            }
+        }
+
+        function inputActive(doc) {
+            let activeEl = getActiveElement(doc);
+            if (activeEl &&
+                ((/INPUT|TEXTAREA/i.test(activeEl.nodeName) &&
+                  activeEl.getAttribute("aria-readonly") != "true"
+                 ) ||
+                 activeEl.contentEditable == 'true'
+                )
+               ) {
+                return true;
+            } else {
+                while (activeEl && activeEl.nodeName) {
+                    if (activeEl.contentEditable == 'true') return true;
+                    if (activeEl.nodeName.toUpperCase() == 'BODY') {
+                        break;
+                    }
+                    activeEl = activeEl.parentNode;
+                }
+            }
+            return false;
+        }
+
+        let keypressing = false;
         function keydown(event) {
-            var key = String.fromCharCode(event.keyCode).toLowerCase();
+
+            //if (ImgWindowC.showing) return;
+            if (gallery && gallery.shown) return;
+            if (inputActive(document)) {
+                return;
+            }
+            var key = event.key;
             if(checkGlobalKeydown(event)){
+                if (!keypressing) {
+                    globalMouseoverHandler(event);
+                    keypressing = true;
+                }
                 if(prefs.floatBar.keys.enable && key==prefs.floatBar.keys.gallery){
                     openGallery();
                     event.stopPropagation();
                     event.preventDefault();
                     globalFuncEnabled = !globalFuncEnabled;
+                    return true;
                 }else if((!gallery || (!gallery.shown && !gallery.minimized)) && prefs.floatBar.globalkeys.type == "press"){
                     globalFuncEnabled = !globalFuncEnabled;
-                }
-                return true;
-            }else{
-                if (!prefs.floatBar.keys.enable || event.ctrlKey || event.shiftKey || event.altKey || event.metaKey){
-                    return false;
-                }
-
-                if (floatBar && floatBar.shown && isKeyDownEffectiveTarget(event.target)) {
-                    Object.keys(prefs.floatBar.keys).some(function(action) {
-                        if (action == 'enable') return;
-                        if (key == prefs.floatBar.keys[action]) {
-                            floatBar.open(null, action);
-                            event.stopPropagation();
-                            event.preventDefault();
-                            return true;
-                        }
-                    })
+                    return true;
                 }
             }
+            if (!prefs.floatBar.keys.enable){
+                return false;
+            }
+
+            if (event) {
+                if (event.ctrlKey || event.metaKey) {
+                    return false;
+                }
+                if (window.getSelection().toString()) return false;
+            }
+            if (floatBar && isKeyDownEffectiveTarget(event.target)) {
+                Object.keys(prefs.floatBar.keys).some(function(action) {
+                    if (action == 'enable' || action == 'search') return;
+                    if (key == prefs.floatBar.keys[action]) {
+                        floatBar.open(event, action);
+                        return true;
+                    }
+                });
+            }
+        }
+
+        function keyup(event) {
+            keypressing = false;
+            let isFuncKey = !event.isTrusted || event.key == 'Alt' || event.key == 'Control' || event.key == 'Meta';
+            if(isFuncKey && (prefs.floatBar.globalkeys.type == "hold" || !checkPreview(event)) && (uniqueImgWin && !uniqueImgWin.removed)){
+                clearTimeout(checkFloatBarTimer);
+                if(prefs.floatBar.globalkeys.closeAfterPreview){
+                    if (uniqueImgWin) {
+                        uniqueImgWin.remove();
+                    }
+                }else{
+                    uniqueImgWin.focus();
+                    uniqueImgWin.imgWindow.classList.remove("pv-pic-window-transition-all");
+                    uniqueImgWin.imgWindow.classList.remove("preview");
+                    uniqueImgWin.previewed=true;
+                    uniqueImgWin = null;
+                }
+            }
+        }
+
+        function createEleFromJson(json) {
+            let collection = document.createDocumentFragment();
+            json.forEach(data => {
+                if (/^script/i.test(data.node)) return;
+                let ele = document.createElement(data.node);
+                if (data.text) {
+                    ele.innerText = data.text;
+                }
+                if (data.attr) {
+                    Object.keys(data.attr).forEach(key => {
+                        if (/^on/i.test(key)) return;
+                        ele.setAttribute(key, data.attr[key]);
+                    });
+                }
+                if (data.children) {
+                    let children = createEleFromJson(data.children);
+                    ele.appendChild(children);
+                }
+                collection.appendChild(ele);
+            });
+            return collection;
         }
 
         window.addEventListener('message', handleMessage, true);
 
         addPageScript();
 
-        document.addEventListener('mouseover', globalMouseoverHandler, true);
+        document.addEventListener('keyup', keyup, false);
+        document.addEventListener('mouseenter', globalMouseoverHandler, true);
         document.addEventListener('mousemove', globalMouseoverHandler, true);
 
         document.addEventListener('mouseout',e=>{
+            if (e.relatedTarget == ImgWindowC.overlayer) return;
             if(uniqueImgWin && !uniqueImgWin.removed){
                 if(checkPreview(e)){
-                    if(removeUniqueWinTimer)clearTimeout(removeUniqueWinTimer);
-                    removeUniqueWinTimer = setTimeout(()=>{uniqueImgWin.remove()},100);
-                }else{
-                    //if(e.target.tagName!="IMG")return;
-                    uniqueImgWin.imgWindow.style.pointerEvents = "auto";
-                    uniqueImgWin.focus();
+                    if (!uniqueImgWin.data.img || !uniqueImgWin.data.img.parentNode) return uniqueImgWin && uniqueImgWin.remove();
+                    let showArea=uniqueImgWin.data.img.getBoundingClientRect();
+                    if(e.clientX < showArea.left + 20 ||
+                      e.clientX > showArea.right - 20 ||
+                      e.clientY < showArea.top + 20 ||
+                      e.clientY > showArea.bottom - 20){
+                        uniqueImgWin && uniqueImgWin.remove();
+                    }
                 }
             }
         }, true);
+        var editSitesFunc={
+            "Lunapic": (src, initOpen) => {
+                _GM_openInTab('https://www.lunapic.com/editor/index.php?action=url&url=' + src, {active:true});
+            },
+            "Pixlr easy": async (src, initOpen) => {
+                if(initOpen){
+                    storage.setItem("editUrl", src);
+                    _GM_openInTab('https://pixlr.com/x/', {active:true});
+                }else{
+                    storage.setItem("editUrl", "");
+                    if(/^https:\/\/pixlr\.com\//.test(location.href)){
+                        await sleep(1000);
+                        await clickEle('#splash-file-menu');
+                        await clickEle('#splash-file-url');
+                        await input('#image-url', src);
+                        await clickEle('.dialog>.buttons>a.button.positive');
+                    }
+                }
+            },
+            "Pixlr advanced": async (src, initOpen) => {
+                if(initOpen){
+                    storage.setItem("editUrl", src);
+                    _GM_openInTab('https://pixlr.com/e/', {active:true});
+                }else{
+                    storage.setItem("editUrl", "");
+                    if(/^https:\/\/pixlr\.com\//.test(location.href)){
+                        await sleep(1000);
+                        await clickEle('#splash-file-menu');
+                        await clickEle('#splash-file-url');
+                        await input('#image-url', src);
+                        await clickEle('.dialog>.buttons>a.button.positive');
+                    }
+                }
+            },
+            "Photopea": async (src, initOpen) => {
+                if(initOpen){
+                    storage.setItem("editUrl", src);
+                    _GM_openInTab('https://www.photopea.com/', {active:true});
+                }else{
+                    storage.setItem("editUrl", "");
+                    if(/^https:\/\/www\.photopea\.com\//.test(location.href)){
+                        await sleep(1000);
+                        await clickEle('.topbar>span>button');
+                        await clickEle('.cmanager>.contextpanel>div:nth-child(4)');
+                        await clickEle('.cmanager>div:last-child>div:nth-child(3)');
+                        await input('span.fitem.tinput>input', src);
+                        await clickEle('.form>button');
+                    }
+                }
+            }
+        };
+        var editSitesName={};
+        for(let key in editSitesFunc){
+            editSitesName[key]=key;
+        }
+        var newsInited = false, newsNode = null;
 
         initLang();
         var customLangOption={
@@ -21218,7 +27606,7 @@ ImgOps | https://imgops.com/#b#`;
         GM_config.init({
             id: 'pv-prefs',
             title: GM_config.create('a', {
-                href: 'https://greasyfork.org/scripts/24204-picviewer-ce',
+                href: 'https://pv.hoothin.com/',
                 target: '_blank',
                 textContent: 'Picviewer CE+ '+i18n("config"),
                 title: i18n("openHomePage")
@@ -21226,9 +27614,11 @@ ImgOps | https://imgops.com/#b#`;
             isTabs: true,
             skin: 'tab',
             frameStyle: {
-                minWidth: "480px",
+                minWidth: "350px",
                 width: ((visualLength((i18n("floatBar") + i18n("magnifier") + i18n("gallery") + i18n("imgWindow") + i18n("others")),"14px","arial,tahoma,myriad pro,sans-serif") + 250) || 480) + 'px',
                 zIndex:'2147483648',
+                margin: '1px',
+                border: '2px solid rgb(0, 0, 0)'
             },
             css: [
                 "#pv-prefs input[type='text'] { width: 50px; } ",
@@ -21241,7 +27631,13 @@ ImgOps | https://imgops.com/#b#`;
                 "#pv-prefs input.color { width: 120px; }",
                 "#pv-prefs input.order { width: 250px; }",
                 "#pv-prefs .config_header>a { border-bottom: solid 2px; }",
-                "#pv-prefs .config_header>a:hover { color: #9f9f9f; }",,
+                "#pv-prefs a:hover { color: #9f9f9f; }",
+                "#pv-prefs a { color: black; }",
+                "#pv-prefs .section_header_holder { padding-right: 10px; }",
+                "#pv-prefs textarea { width: 100%; }",
+                "#pv-prefs .nav-tabs { white-space: nowrap; width: fit-content; max-width: 100%; margin: 20 auto; display: flex; overflow-x: auto; overflow-y: visible; }",
+                "#pv-prefs_buttons_holder { position: fixed; bottom: 0; width: 100%; right: 10px; background: #EEE; }",
+                "#pv-prefs_wrapper { padding-bottom: 70px; }"
             ].join('\n'),
             fields: {
                 // 浮动工具栏
@@ -21329,11 +27725,33 @@ ImgOps | https://imgops.com/#b#`;
                     type: "checkbox",
                     "default": false
                 },
+                'floatBar.showWithRules': {
+                    label: i18n("showWithRules"),
+                    type: "checkbox",
+                    "default": prefs.floatBar.showWithRules,
+                    title: i18n("showWithRulesTip"),
+                },
                 'floatBar.butonOrder': {
                     label: i18n("butonOrder"),
                     type: 'text',
                     className: 'order',
+                    title: 'actual,current,gallery,magnifier,download',
                     "default": prefs.floatBar.butonOrder.join(', '),
+                },
+                'floatBar.additionalFeature': {
+                    label: i18n("additionalFeature"),
+                    type: 'select',
+                    options: {
+                        'copy': i18n("copy"),
+                        'copyImg': i18n("copyImg"),
+                        'open': i18n("openInNewTab")
+                    },
+                    "default": prefs.floatBar.additionalFeature || 'open'
+                },
+                'floatBar.invertAdditionalFeature': {
+                    label: i18n("invertAdditionalFeature"),
+                    type: 'checkbox',
+                    "default": prefs.floatBar.invertAdditionalFeature
                 },
                 'floatBar.listenBg': {
                     label: i18n("listenBg"),
@@ -21361,7 +27779,7 @@ ImgOps | https://imgops.com/#b#`;
                     "default": false,
                 },
                 'floatBar.globalkeys.command': {
-                    after: "COMMAND",
+                    after: "META",
                     type: 'checkbox',
                     className: 'sep-x',
                     "default": false,
@@ -21380,6 +27798,32 @@ ImgOps | https://imgops.com/#b#`;
                     label: i18n("initShow"),
                     type: 'checkbox',
                     "default": prefs.floatBar.globalkeys.invertInitShow
+                },
+                'floatBar.globalkeys.closeAfterPreview': {
+                    label: i18n("closeAfterPreview"),
+                    type: 'checkbox',
+                    "default": prefs.floatBar.globalkeys.closeAfterPreview
+                },
+                'floatBar.previewMaxSizeW': {
+                    label: i18n("previewMaxSize"),
+                    type: 'int',
+                    className: 'size',
+                    "default": prefs.previewMaxSizeW || 0,
+                    title: i18n("previewMaxSizeTip"),
+                    line: 'start',
+                },
+                'floatBar.previewMaxSizeH': {
+                    label: ' x ',
+                    type: 'int',
+                    className: 'sep-x',
+                    after: ' '+i18n("px"),
+                    "default": prefs.previewMaxSizeH || 0,
+                    line: 'end',
+                },
+                'floatBar.globalkeys.previewFollowMouse': {
+                    label: i18n("previewFollowMouse"),
+                    type: 'checkbox',
+                    "default": prefs.floatBar.globalkeys.previewFollowMouse
                 },
                 // 按键
                 'floatBar.keys.enable': {
@@ -21428,6 +27872,11 @@ ImgOps | https://imgops.com/#b#`;
                     className: 'floatBar-key',
                     "default": prefs.floatBar.keys.download
                 },
+                'floatBar.disableKeySites': {
+                    label: i18n("disableKeySites"),
+                    type: 'textarea',
+                    "default": prefs.floatBar.disableKeySites
+                },
 
                 // 放大镜
                 'magnifier.radius': {
@@ -21441,6 +27890,37 @@ ImgOps | https://imgops.com/#b#`;
                     label: i18n("magnifierWheelZoomEnabled"),
                     type: 'checkbox',
                     "default": prefs.magnifier.wheelZoom.enabled,
+                },
+                'magnifier.wheelZoom.scaleImage': {
+                    label: i18n("magnifierScaleImage"),
+                    type: 'checkbox',
+                    "default": prefs.magnifier.wheelZoom.scaleImage !== false,
+                },
+                'magnifier.wheelZoom.ctrl': {
+                    label: '',
+                    type: 'checkbox',
+                    after: "CTRL +",
+                    "default": false,
+                    line: 'start'
+                },
+                'magnifier.wheelZoom.alt': {
+                    after: "ALT +",
+                    type: 'checkbox',
+                    className: 'sep-x',
+                    "default": false,
+                },
+                'magnifier.wheelZoom.shift': {
+                    after: "SHIFT +",
+                    type: 'checkbox',
+                    className: 'sep-x',
+                    "default": false,
+                },
+                'magnifier.wheelZoom.meta': {
+                    after: "META",
+                    type: 'checkbox',
+                    className: 'sep-x',
+                    "default": false,
+                    line: 'end',
                 },
                 'magnifier.wheelZoom.range': {
                     label: i18n("magnifierWheelZoomRange"),
@@ -21484,6 +27964,13 @@ ImgOps | https://imgops.com/#b#`;
                     "default": prefs.gallery.scrollEndToChange,
                     title: i18n("galleryScrollEndToChangeTip")
                 },
+                'gallery.backgroundColor': {
+                    label: i18n("backgroundColor"),
+                    type: 'text',
+                    className: 'color',
+                    "default": prefs.gallery.backgroundColor || 'rgba(20,20,20,0.75)',
+                    line: 'end'
+                },
                 'gallery.exportType': {
                     label: i18n("galleryExportType"),
                     type: 'select',
@@ -21521,6 +28008,24 @@ ImgOps | https://imgops.com/#b#`;
                     "default": prefs.gallery.downloadGap,
                     after: ' ms',
                 },
+                'gallery.formatConversion': {
+                    label: i18n("formatConversion"),
+                    type: 'textarea',
+                    title: 'webp>png\nx-icon>png',
+                    "default": prefs.gallery.formatConversion || ''
+                },
+                'gallery.aria2Host': {
+                    label: i18n("aria2Host"),
+                    type: 'text',
+                    className: 'order',
+                    "default": prefs.gallery.aria2Host || 'http://localhost:6800',
+                    after: '/jsonrpc'
+                },
+                'gallery.aria2Token': {
+                    label: i18n("aria2Token"),
+                    type: 'text',
+                    "default": prefs.gallery.aria2Token || ''
+                },
                 'gallery.scaleSmallSize': {
                     label: i18n("galleryScaleSmallSize1"),
                     type: 'int',
@@ -21536,6 +28041,11 @@ ImgOps | https://imgops.com/#b#`;
                     label: i18n("galleryTransition"),
                     type: 'checkbox',
                     "default": prefs.gallery.transition
+                },
+                'gallery.disableArrow': {
+                    label: i18n("galleryDisableArrow"),
+                    type: 'checkbox',
+                    "default": prefs.gallery.disableArrow
                 },
                 'gallery.sidebarPosition': {
                     label: i18n("gallerySidebarPosition"),
@@ -21575,15 +28085,6 @@ ImgOps | https://imgops.com/#b#`;
                     "default": prefs.gallery.descriptionLength,
                     after: i18n("galleryDescriptionLength2")
                 },
-                'gallery.viewmoreLayout': {
-                    label: i18n("galleryViewmoreLayout"),
-                    type: 'select',
-                    options: {
-                        '0': "default",
-                        '1': "flex-box"
-                    },
-                    "default": prefs.gallery.viewmoreLayout
-                },
                 'gallery.autoOpenViewmore': {
                     label: i18n("autoOpenViewmore"),
                     type: 'checkbox',
@@ -21599,15 +28100,12 @@ ImgOps | https://imgops.com/#b#`;
                     type: 'textarea',
                     "default": prefs.gallery.searchData
                 },
-                /*'gallery.editSite': {
+                'gallery.editSite': {
                     label: i18n("galleryEditSite"),
                     type: 'select',
-                    options: {
-                        'Pixlr': 'Pixlr',
-                        'Toolpic': 'Toolpic'
-                    },
+                    options: editSitesName,
                     "default": prefs.gallery.editSite,
-                },*/
+                },
 
                 // 图片窗口
                 'imgWindow.fitToScreen': {
@@ -21617,10 +28115,20 @@ ImgOps | https://imgops.com/#b#`;
                     section: [i18n("imgWindow")],
                     title: i18n("imgWindowFitToScreenTip"),
                 },
+                'imgWindow.fitToScreenSmall': {
+                    label: i18n("imgWindowFitToScreenWhenSmall"),
+                    type: 'checkbox',
+                    "default": prefs.imgWindow.fitToScreenSmall
+                },
                 'imgWindow.suitLongImg': {
                     label: i18n("suitLongImg"),
                     type: 'checkbox',
                     "default": prefs.imgWindow.suitLongImg
+                },
+                'imgWindow.switchStoreLoc': {
+                    label: i18n("switchStoreLoc"),
+                    type: 'checkbox',
+                    "default": prefs.imgWindow.switchStoreLoc
                 },
                 'imgWindow.defaultTool': {
                     label: i18n("imgWindowDefaultTool"),
@@ -21695,6 +28203,11 @@ ImgOps | https://imgops.com/#b#`;
                         "spellcheck": "false"
                     }
                 },
+                'imgWindow.fixed': {
+                    label: i18n("positionFixed"),
+                    "default": prefs.imgWindow.fixed,
+                    type: 'checkbox',
+                },
                 'imgWindow.zIndex': {
                     label: "z-Index",
                     "default": prefs.imgWindow.zIndex,
@@ -21716,13 +28229,34 @@ ImgOps | https://imgops.com/#b#`;
                     "default": prefs.customLang,
                     line: 'end',
                 },
+                'saveName': {
+                    label: i18n("saveName"),
+                    type: 'select',
+                    options: {
+                        0: i18nData.saveNameUrlFirst || i18n("default"),
+                        1: i18n("textFirst"),
+                        2: i18n("onlyUrl"),
+                        3: i18n("urlAndText")
+                    },
+                    "default": (prefs.saveName || 0),
+                    title: i18n("saveNameTip"),
+                },
+                'saveNameAddTitle': {
+                    label: i18n("saveNameAddTitle"),
+                    type: 'checkbox',
+                    "default": !!prefs.saveNameAddTitle
+                },
                 'debug': {
                     label: i18n("debug"),
                     type: 'checkbox',
                     "default": prefs.debug
                 },
                 'customRules': {
-                    label: i18n("customRules"),
+                    label: GM_config.create('a', {
+                        href: 'https://github.com/hoothin/UserScripts/tree/master/Picviewer%20CE%2B#-custom-rules-example',
+                        target: '_blank',
+                        textContent: i18n("customRules")
+                    }),
                     type: 'textarea',
                     "default": prefs.customRules
                 }
@@ -21738,12 +28272,43 @@ ImgOps | https://imgops.com/#b#`;
                 },*/
             },
             events: {
-                open: function(doc, win, frame) {
-                    let saveBtn=doc.querySelector("#"+this.id+"_saveBtn");
-                    let closeBtn=doc.querySelector("#"+this.id+"_closeBtn");
-                    let resetLink=doc.querySelector("#"+this.id+"_resetLink");
-                    saveBtn.textContent=i18n("saveBtn");
-                    saveBtn.title=i18n("saveBtnTips");
+                open: async function(doc, win, frame) {
+                    if (localStorage && localStorage.getItem && localStorage.getItem('picviewerCE.config.curTab') === null) {
+                        localStorage.setItem('picviewerCE.config.curTab', 4);
+                    }
+                    isConfigOpen = true;
+                    let saveBtn = doc.querySelector("#"+this.id+"_saveBtn");
+                    let closeBtn = doc.querySelector("#"+this.id+"_closeBtn");
+                    let resetLink = doc.querySelector("#"+this.id+"_resetLink");
+                    let customInput = doc.querySelector("#"+this.id+"_field_customRules");
+                    customInput.style.height = "188px";
+                    customInput.setAttribute("spellcheck", "false");
+                    saveBtn.textContent = i18n("saveBtn");
+                    saveBtn.title = i18n("saveBtnTips");
+                    saveBtn.addEventListener('click', e => {
+                        if (customInput.value) {
+                            if (customInput.value.trim().indexOf("[") != 0) {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                alert("The rules must be enclosed in square brackets ([]).");
+                                return;
+                            }
+                            try {
+                                var customRules;
+                                if (customInput.value.indexOf("name:") !== -1) {
+                                    if (!isunsafe()) {
+                                        unsafeWindow.eval(createScript(customInput.value));
+                                    }
+                                } else {
+                                    customInput.value = JSON.stringify(JSON.parse(customInput.value), null, 4);
+                                }
+                            } catch(err) {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                alert("Wrong rule:" + err.toString());
+                            }
+                        }
+                    }, true);
                     closeBtn.textContent=i18n("closeBtn");
                     closeBtn.title=i18n("closeBtnTips");
                     resetLink.textContent=i18n("resetLink");
@@ -21752,43 +28317,268 @@ ImgOps | https://imgops.com/#b#`;
                     if(searchData && searchData.value==""){
                         searchData.value=defaultSearchData;
                     }
+                    let about = doc.getElementById(this.id + "_section_4");
+                    if (about) {
+                        if (!newsNode) {
+                            newsNode = document.createElement("div");
+                            let newsEles = createEleFromJson([
+                                {
+                                    node: "div",
+                                    text: "Made with ❤️ by @",
+                                    attr: {
+                                        style: "width: calc(100% - 8px); text-align: center;"
+                                    },
+                                    children: [
+                                        {
+                                            node: "a",
+                                            text: "Hoothin",
+                                            attr: {
+                                                href: "https://www.hoothin.com/",
+                                                target: "_blank"
+                                            }
+                                        },
+                                        {
+                                            node: "br"
+                                        },
+                                        {
+                                            node: "a",
+                                            text: "Star Me on 🐱Github",
+                                            attr: {
+                                                href: "https://github.com/hoothin/UserScripts",
+                                                target: "_blank"
+                                            }
+                                        },
+                                        {
+                                            node: "br"
+                                        },
+                                        {
+                                            node: "span",
+                                            text: "Join our "
+                                        },
+                                        {
+                                            node: "a",
+                                            text: "Discord",
+                                            attr: {
+                                                href: "https://discord.com/invite/keqypXC6wD",
+                                                target: "_blank"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    node: "img",
+                                    attr: {
+                                        src: "https://s2.loli.net/2023/02/06/afTMxeASm48z5vE.jpg",
+                                        style: "width: 100%; margin-top: 5px; max-height: 180px; display: none;",
+                                        onload: "this.style.display=''"
+                                    }
+                                },
+                                {
+                                    node: "div",
+                                    attr: {
+                                        style: "width: 100%; display: flex; align-items: center; justify-content: center; margin-top: 5px; font-size: 14px;"
+                                    },
+                                    children: [
+                                        {
+                                            node: "img",
+                                            attr: {
+                                                src: "https://ko-fi.com/favicon-32x32.png",
+                                                style: "margin-right: 5px; height: 25px; display: none;",
+                                                onload: "this.style.display=''"
+                                            }
+                                        },
+                                        {
+                                            node: "a",
+                                            text: "Ko-fi",
+                                            attr: {
+                                                href: "https://ko-fi.com/hoothin",
+                                                style: "margin-right: 10px;",
+                                                target: "_blank"
+                                            }
+                                        },
+                                        {
+                                            node: "img",
+                                            attr: {
+                                                src: "https://static.afdiancdn.com/favicon.ico",
+                                                style: "margin-right: 5px; height: 20px; display: none;",
+                                                onload: "this.style.display=''"
+                                            }
+                                        },
+                                        {
+                                            node: "a",
+                                            text: "爱发电",
+                                            attr: {
+                                                href: "https://afdian.com/@hoothin",
+                                                target: "_blank"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]);
+                            newsNode.style.padding = "5px";
+                            newsNode.appendChild(newsEles);
+                            about.appendChild(newsNode);
+                        }
+                        if (!newsInited) {
+                            let news = await GM_fetch(`https://hoothin.com/scripts/pvcep/${lang}`).then(response => response.json()).catch(e => {});
+                            newsInited = true;
+                            if (!news) return;
+                            let newsEles = createEleFromJson(news);
+                            if (newsEles && newsEles.childElementCount) {
+                                if (newsNode) about.removeChild(newsNode);
+                                newsNode = document.createElement("div");
+                                newsNode.appendChild(newsEles);
+                            }
+                        }
+                        about.appendChild(newsNode);
+                    }
                 },
                 save: function() {
                     loadPrefs();
                     storage.setItem("customLang", prefs.customLang);
+                },
+                close: function() {
+                    isConfigOpen = false;
                 }
             }
         });
 
 
-        var hideIcon=false;
+
+        loadPrefs();
+
+        var hideIcon=storage.getListItem("hideIcon", location.hostname) || false;
         var hideIconStyle=document.createElement('style');
         hideIconStyle.textContent=`#pv-float-bar-container{display:none!important}`;
+        if(hideIcon){
+            document.head.appendChild(hideIconStyle);
+        }
         _GM_registerMenuCommand(i18n("openConfig"), openPrefs);
         _GM_registerMenuCommand(i18n("openGallery"), openGallery);
-        _GM_registerMenuCommand(i18n("toggleIcon"), ()=>{
+        _GM_registerMenuCommand(i18n("stitch"), () => {
+            if (ImgWindowC.all && ImgWindowC.all.length) {
+                ImgWindowC.all.slice(0).forEach(win => win.remove(true));
+            }
+            if (stitcher) stitcher.openSelect();
+        });
+        _GM_registerMenuCommand(i18n("hideIcon") + (hideIcon ? "☑️" : ""), () => {
             hideIcon=!hideIcon;
+            storage.setListItem("hideIcon", location.hostname, hideIcon);
             if(hideIcon){
                 document.head.appendChild(hideIconStyle);
             }else{
                 document.head.removeChild(hideIconStyle);
             }
         });
+        function buildDisableKeyPattern() {
+            let originPattern = location.origin.replace(/^https?/, "https?").replace(/\./g, "\\.");
+            let pathBase = location.pathname.replace(/[^\/]*$/, "");
+            return "^" + originPattern + pathBase;
+        }
+        function isDisableKeyPatternMatched() {
+            let pattern = buildDisableKeyPattern();
+            let list = normalizeDisableKeySites(prefs.floatBar.disableKeySites);
+            return list.indexOf(pattern) !== -1;
+        }
+        _GM_registerMenuCommand(
+            isDisableKeyPatternMatched() ? i18n("restoreKeyForHost") : i18n("disableKeyForHost"),
+            () => {
+                let pattern = buildDisableKeyPattern();
+                let list = normalizeDisableKeySites(prefs.floatBar.disableKeySites);
+                if (list.indexOf(pattern) === -1) {
+                    list.unshift(pattern);
+                    saveDisableKeySites(list);
+                } else {
+                    let nextList = list.filter(item => item !== pattern);
+                    saveDisableKeySites(nextList);
+                }
+            }
+        );
+        _GM_registerMenuCommand(i18n("ruleRequest"), () => {
+            _GM_openInTab("https://github.com/hoothin/UserScripts/issues/new?labels=Picviewer%20CE%2B&template=custom-rule-request.md&title=Request%20Picviewer%20CE%2B%20support%20for%20" + location.hostname, {active:true});
+        });
 
-        loadPrefs();
+        function initKeyInputs() {
+            if (!GM_config.frame || !GM_config.frame.contentDocument) return;
+            let keyInputs = GM_config.frame.contentDocument.querySelectorAll('input.floatBar-key');
+            [].forEach.call(keyInputs, input => {
+                input.setAttribute('readOnly', 'readonly');
+                input.addEventListener("keydown", e => {
+                    if (e.key === 'Escape' || e.key === 'Backspace') input.value = '';
+                    else input.value = e.key;
+                    e.stopPropagation();
+                    e.preventDefault();
+                });
+            });
+        }
 
         matchedRule = getMatchedRule();
+        let editUrl=storage.getItem("editUrl");
+        if(editUrl){
+            let editFunc=editSitesFunc[prefs.gallery.editSite];
+            if(!editFunc)editFunc=editSitesFunc[Object.keys(editSitesFunc)[0]];
+            if(editFunc){
+                if (document.readyState == 'complete'){
+                    editFunc(editUrl);
+                }else{
+                    let readystatechangeHandler = e => {
+                        if (document.readyState == 'complete') {
+                            editFunc(editUrl);
+                            document.removeEventListener('readystatechange', readystatechangeHandler);
+                        }
+                    };
+                    document.addEventListener('readystatechange', readystatechangeHandler);
+                }
+            }
+        }
 
-        if(prefs.gallery.autoOpenSites){
-            var sitesArr=prefs.gallery.autoOpenSites.split("\n");
-            for(var s=0;s<sitesArr.length;s++){
-                var siteReg=sitesArr[s].trim();
-                var autoViewMore=siteReg[0]=="@";
+        var configStyle = document.createElement("style");
+        configStyle.textContent = "#pv-prefs { display: initial; }";
+        configStyle.type = 'text/css';
+        if ((location.hostname == "hoothin.github.io" && location.pathname == "/UserScripts/Picviewer%20CE+/") || (location.hostname == "pv.hoothin.com" && location.pathname.indexOf("open-settings") !== -1)) {
+            openPrefs();
+        } else if (location.hostname == "hoothin.github.io" && location.pathname == "/UserScripts/Picviewer%20CE+/gallery.html") {
+            let gallery = new GalleryC();
+            gallery.data = [];
+            gallery.lockGallery = true;
+            var allData = await gallery.getAllValidImgs();
+            gallery.data = allData;
+            gallery.load(gallery.data);
+            let searchParams = new URLSearchParams(location.search);
+            let viewMore = searchParams.get("mode");
+            let imgs = searchParams.get("imgs");
+            if (imgs) {
+                gallery.addImageUrls(imgs);
+            }
+            if (viewMore == "1") {
+                gallery.maximizeSidebar();
+            }
+            let imgCon = gallery.eleMaps['img-content'], waitingDouble = false, openImageTimer;
+            imgCon.addEventListener('click', e => {
+                if (e.target == imgCon) {
+                    clearTimeout(openImageTimer);
+                    if (waitingDouble) {
+                        waitingDouble = false;
+                        gallery.openImages({altKey: true});
+                        return;
+                    }
+                    waitingDouble = true;
+                    openImageTimer = setTimeout(() => {
+                        waitingDouble = false;
+                        gallery.openImages(e);
+                    }, 300);
+                }
+            }, true);
+        } else if (prefs.gallery.autoOpenSites) {
+            let sitesArr=prefs.gallery.autoOpenSites.split("\n");
+            for(let s=0;s<sitesArr.length;s++){
+                let siteReg=sitesArr[s].trim();
+                let autoViewMore=siteReg[0]=="@";
                 if(autoViewMore)siteReg=siteReg.substr(1);
-                if(new RegExp(siteReg).test(location.href)){
-                    setTimeout(function(){
-                        var gallery = openGallery();
-                        if(autoViewMore)gallery.maximizeSidebar();
+                if(new RegExp(siteReg).test(_URL)){
+                    setTimeout(async function(){
+                        let gallery = await openGallery();
+                        if (gallery && autoViewMore) gallery.maximizeSidebar();
                     },2000);
                     break;
                 }
@@ -21796,15 +28586,107 @@ ImgOps | https://imgops.com/#b#`;
         }
 
         // 注册按键
-        document.addEventListener('keydown', keydown, false);
+        function normalizeDisableKeySites(value) {
+            if (!value) return [];
+            return value.split("\n").map(s => s.trim()).filter(Boolean);
+        }
+
+        function isKeyDisabledForUrl(url, host, list) {
+            for (let i = 0; i < list.length; i++) {
+                let siteReg = list[i];
+                try {
+                    let reg = new RegExp(siteReg);
+                    if (reg.test(url) || reg.test(host)) return true;
+                } catch (e) {
+                }
+            }
+            return false;
+        }
+
+        let keydownBound = false;
+        function updateKeydownListener() {
+            let list = normalizeDisableKeySites(prefs.floatBar.disableKeySites);
+            let disableKey = isKeyDisabledForUrl(_URL, location.hostname, list);
+            if (!disableKey && !keydownBound) {
+                document.addEventListener('keydown', keydown, true);
+                keydownBound = true;
+            } else if (disableKey && keydownBound) {
+                document.removeEventListener('keydown', keydown, true);
+                keydownBound = false;
+            }
+        }
+        updateKeydownListener();
+
+        function saveDisableKeySites(list) {
+            let value = list.join("\n");
+            prefs.floatBar.disableKeySites = value;
+            if (GM_config && GM_config.set) {
+                GM_config.set('floatBar.disableKeySites', value);
+                let field = GM_config.fields && GM_config.fields['floatBar.disableKeySites'];
+                if (field && field.node) field.node.value = value;
+                GM_config.save();
+            }
+            updateKeydownListener();
+        }
+
+        let canImport = false;
+        for (let i = 0; i < ruleImportHost.length; i++) {
+            if (location.host.indexOf(ruleImportHost[i]) !== -1) {
+                canImport = true;
+                break;
+            }
+        }
+        if (canImport) {
+            document.addEventListener('click', e => {
+                if (!ruleImportUrlReg.test(location.href)) return;
+                if (/pre|code/i.test(e.target.nodeName)) {
+                    let content = e.target.innerText.trim();
+                    if (/"name":/.test(content) && /"(r|xhr)":/.test(content)) {
+                        try {
+                            localStorage.setItem('picviewerCE.config.curTab', 4);
+                            let webRule = JSON.parse(content.replace(/^\/\/.*/g, ""));
+                            let customRules;
+                            let fieldsCustomRules = GM_config.fields.customRules;
+                            if (prefs.customRules.indexOf('"name":') !== -1) {
+                                customRules = JSON.parse(prefs.customRules);
+                            } else {
+                                customRules = [];
+                            }
+                            customRules.push(webRule);
+                            fieldsCustomRules.value = JSON.stringify(customRules, null, 4);
+                            openPrefs();
+                        } catch (e) {
+                            alert(e.toString());
+                        }
+                    }
+                }
+            }, true);
+        }
 
         function openPrefs() {
+            if (window.top != window.self) return;
+            let fieldsSearchData = GM_config.fields["gallery.searchData"];
+            if (fieldsSearchData && fieldsSearchData.value) {
+                fieldsSearchData.value = fieldsSearchData.value.replace(/&amp;/g, "&").replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&/g, "&amp;").replace(/>/g, "&gt;").replace(/</g, "&lt;");
+            }
+            let fieldsCustomRules = GM_config.fields.customRules;
+            if (fieldsCustomRules && fieldsCustomRules.value) {
+                fieldsCustomRules.value = fieldsCustomRules.value.replace(/&amp;/g, "&").replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&/g, "&amp;").replace(/>/g, "&gt;").replace(/</g, "&lt;");
+            }
+            document.head.appendChild(configStyle);
             GM_config.open();
+            document.documentElement.appendChild(GM_config.frame);
+
             setTimeout(()=>{
-                if(GM_config.frame && GM_config.frame.style && GM_config.frame.style.display=="none"){
+                if (GM_config.frame && GM_config.frame.contentDocument.body.innerHTML === "") {
+                    _GM_openInTab("https://pv.hoothin.com/open-settings", {active:true});
+                    return;
+                }
+                if (GM_config.frame && GM_config.frame.style && GM_config.frame.style.display == "none") {
                     GM_config.frame.src="";
                 }
-            },500);
+                initKeyInputs();
+            }, 1000);
         }
 
         function loadPrefs() {
@@ -21832,17 +28714,31 @@ ImgOps | https://imgops.com/#b#`;
                     }
                 }
             });
+            try {
+                if (!storage.getItem('inited')) {
+                    _GM_openInTab("https://pv.hoothin.com/first-run", {active:true});
+                    storage.setItem('inited', true);
+                }
+            } catch(e) {}
+            if (typeof prefs.gallery.formatConversion == 'undefined') {
+                prefs.gallery.formatConversion = "webp>png";
+            }
+            prefs.gallery.formatConversion.split("\n").forEach(str => {
+                let pair = str.split(">");
+                if (pair.length !== 2) return;
+                formatDict.set(pair[0].trim(), pair[1].trim());
+            });
 
-            debug = prefs.debug ? console.debug.bind(console) : function() {};
+            debug = prefs.debug ? console.log.bind(console) : function() {};
         }
 
     };
 
     function drawTobase64(img){
-        let canvas = document.createElement('CANVAS');
         canvas.width = img.naturalWidth || img.width;
         canvas.height = img.naturalHeight || img.height;
         let ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
         return canvas.toDataURL("image/png");
     }
@@ -21867,46 +28763,9 @@ ImgOps | https://imgops.com/#b#`;
 
 
     var arrayFn=(function(){
-        //Array的某些方法对所有的类数组都有效，比如HTMLCollection,NodeList,DOMStringList.....
-
-        //添加一个当函数返回true时，返回[array[index],index]，并且跳出循环的方法
-        //类似做到 for 循环，在满足条件的时候直接break跳出的效果。
-        if(typeof Array.prototype['_find']!='function'){
-            Object.defineProperty(Array.prototype,'_find',{
-                value:function(callback , thisArg){
-                    if (this == null){
-                        throw new TypeError( "this is null or not defined" );
-                    };
-
-                    if(typeof callback != 'function') {
-                        throw new TypeError( callback + " is not a function" );
-                    };
-
-                    var i = 0,
-                        l = this.length,
-                        value,
-                        hasOwnProperty=Object.prototype.hasOwnProperty;
-
-
-                    while(i<l){
-                        if(hasOwnProperty.call(this,i)){
-                            value = this[i];
-                            if(callback.call( thisArg, value, i, this )===true){
-                                return [value,i,this];
-                            };
-                        };
-                        i++;
-                    };
-                },
-                writable:true,
-                enumerable:false,//与原生方法一样不可枚举，维护网页和谐。。。
-                configurable:true,
-            });
-        };
-
         var arrayProto=Array.prototype;
         return {
-            _find:arrayProto._find,
+            find:arrayProto.find,
             slice:arrayProto.slice,
             forEach:arrayProto.forEach,
             some:arrayProto.some,
@@ -21934,43 +28793,69 @@ ImgOps | https://imgops.com/#b#`;
             };
         })(),
         setItem:function(key,value){
-            if(this.operaUJSStorage){
-                this.operaUJSStorage.setItem(key,value);
-            }else if(this.mxAppStorage){
-                this.mxAppStorage.setConfig(key,value);
-            }else if(this.supportGM){
-                GM_setValue(key,value);
-            }else if(window.localStorage){
-                window.localStorage.setItem(key,value);
-            };
+            if (this.supportGM) {
+                GM_setValue(key, value);
+                if (value === "" && typeof GM_deleteValue != 'undefined') {
+                    GM_deleteValue(key);
+                }
+            } else if (this.operaUJSStorage) {
+                this.operaUJSStorage.setItem(key, value);
+            } else if (this.mxAppStorage) {
+                this.mxAppStorage.setConfig(key, value);
+            } else if (window.localStorage) {
+                window.localStorage.setItem(key, value);
+            }
         },
         getItem:function(key){
             var value;
-            if(this.operaUJSStorage){
+            if(this.supportGM){
+                value=GM_getValue(key);
+            }else if(this.operaUJSStorage){
                 value=this.operaUJSStorage.getItem(key);
             }else if(this.mxAppStorage){
                 value=this.mxAppStorage.getConfig(key);
-            }else if(this.supportGM){
-                value=GM_getValue(key);
             }else if(window.localStorage){
                 value=window.localStorage.getItem(key);
             };
             return value;
         },
+        getListItem: function(list, key) {
+            var value;
+            var listData = this.getItem(list);
+            if (listData) {
+                for(var i = 0; i < listData.length; i++) {
+                    var data = listData[i];
+                    if (data.k == key) {
+                        value = data.v;
+                        break;
+                    }
+                }
+            }
+            return value;
+        },
+        setListItem: function(list, key, value, limitNum = 50) {
+            var listData = this.getItem(list);
+            if (!listData || !listData.filter) listData = [];
+            listData = listData.filter(data => data && data.k != key);
+            if (value) {
+                listData.unshift({k: key, v: value});
+                if (listData.length > limitNum) listData.pop();
+            }
+            this.setItem(list, listData);
+        }
     };
 
     function getUrl(url, callback, onError){
         _GM_xmlhttpRequest({
             method: 'GET',
-            url: url,
+            url: url.trim(),
             onload: callback,
             onerror: onError
         });
     }
 
-    function setSearchState(words,imgCon){
-        var searchState = (imgCon?imgCon:document).querySelector('.pv-pic-search-state');
-        if(searchState)searchState.innerHTML=createHTML(words);
+    function setSearchState(words, imgState){
+        if (imgState) setHTML(imgState, words);
     }
 
     var searchSort=["Tineye","Google","Baidu"];
@@ -22092,6 +28977,22 @@ ImgOps | https://imgops.com/#b#`;
         switchSearch();
     }
 
-    init2();
+    if (window.top != window.self) {
+        if (window.self.innerWidth === 0 && window.self.innerHeight === 0) {
+            if (document.readyState !== "complete") {
+                window.addEventListener('load', e => {
+                    setTimeout(() => {
+                        if (window.self.innerWidth > 250 && window.self.innerHeight > 250) {
+                            init2();
+                        }
+                    }, 500);
+                });
+            }
+        } else {
+            init2();
+        }
+    } else {
+        init2();
+    }
 
 })(this,window,document,(typeof unsafeWindow=='undefined'? window : unsafeWindow));
